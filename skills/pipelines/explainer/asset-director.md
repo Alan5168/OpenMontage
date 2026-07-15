@@ -55,6 +55,17 @@ Also create tasks for:
 - **Background music** — one track for the whole video (use `music_gen` or select from library)
 - **Sound effects** — per playbook's `sfx_style` (optional, use `music_gen` or stock)
 
+### Step 1b: TTS preprocess (required before batch TTS)
+
+Before calling `tts_selector` / any TTS provider on full sections:
+
+1. Run **`tts_preprocess`** on the schema-valid `script` artifact (locale `en` or `zh`).
+2. Feed the **preprocessed** section text (or merged `.txt`) to the TTS engine — not raw markdown drafts.
+3. Rules applied: strip markdown residue, expand numbers to words, expand common abbreviations (EN), locale punctuation (ZH em-dash → comma), optional pause tags from `speaker_directions`.
+4. Keep pronunciation guides from the script; still consult any human `pronunciation_sheet` side car for first-pass QA.
+
+Tool: `tools/audio/tts_preprocess.py` (capability `tts_preprocess`, free, offline, deterministic).
+
 ### Step 2: Check Budget
 
 Before generating anything:

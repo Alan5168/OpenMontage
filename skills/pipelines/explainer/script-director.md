@@ -16,6 +16,7 @@ The script is the backbone of the video. Every visual, every scene, every audio 
 | Playbook | Active style playbook from `proposal_packet.selected_concept.suggested_playbook` | Voice style, pacing rules |
 | Meta skill | `skills/meta/voice-performance-director.md` | Structured TTS delivery cues for natural, expressive narration |
 | Layer 3 | TTS provider skills (check `agent_skills` on the selected TTS tool) | TTS capabilities for speaker directions |
+| Tool | `tts_preprocess` (`tools/audio/tts_preprocess.py`) | Deterministic hop: script JSON → engine-ready text (numbers, abbrev, markdown strip). Asset stage runs this **before** `tts_selector`. |
 
 ## Process
 
