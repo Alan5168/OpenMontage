@@ -67,8 +67,11 @@ class TTSSelector(BaseTool):
             },
             "preferred_provider": {
                 "type": "string",
-                "description": "Provider name or 'auto'. Valid values are discovered at runtime from the registry.",
-                "default": "auto",
+                "description": (
+                    "Provider name or 'auto'. Default is 'minimax' (Token Plan TTS) when available; "
+                    "falls back to scored ranking if unavailable. Valid values are discovered at runtime."
+                ),
+                "default": "minimax",
             },
             "allowed_providers": {
                 "type": "array",
@@ -163,7 +166,8 @@ class TTSSelector(BaseTool):
         """Select the best TTS provider using scored ranking."""
         from lib.scoring import rank_providers
 
-        preferred = inputs.get("preferred_provider", "auto")
+        # Alan policy 2026-07-15: default preferred_provider=minimax (Token Plan).
+        preferred = inputs.get("preferred_provider") or "minimax"
         allowed = set(inputs.get("allowed_providers") or [])
         if allowed:
             candidates = [tool for tool in candidates if tool.provider in allowed]
@@ -179,6 +183,7 @@ class TTSSelector(BaseTool):
             for score_item in rankings:
                 if score_item.provider == preferred and score_item.provider in tool_by_provider:
                     return tool_by_provider[score_item.provider], score_item
+            # Preferred unavailable (e.g. no MINIMAX_API_KEY) → fall through to ranking.
 
         for score_item in rankings:
             if score_item.provider in tool_by_provider:
