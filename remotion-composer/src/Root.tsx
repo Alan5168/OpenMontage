@@ -16,6 +16,10 @@ import { ProductReveal, ProductRevealProps } from "./components/ProductReveal";
 import { CaptionOverlay, WordCaption } from "./components/CaptionOverlay";
 import { CollageBurst, CollageBurstProps } from "./CollageBurst";
 import { LyricOverlay, LyricOverlayProps } from "./LyricOverlay";
+import {
+  WorldCupDaily,
+  calculateWorldCupDailyMetadataFx,
+} from "./templates/world-cup-daily";
 
 // ---------------------------------------------------------------------------
 // Theme System — prevents every video from looking like dark fintech
@@ -329,6 +333,22 @@ export const Root: React.FC = () => {
           fadeOutSeconds: 1.5,
           overlay: true,
         } as EndTagProps}
+      />
+      <Composition
+        id="template-world-cup-daily"
+        component={WorldCupDaily as any}
+        durationInFrames={30 * 59}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{
+          intro: { title: "世界杯日报", theme: "world-cup-2026" },
+          host: { name: "Host" },
+          edition: "Template Preview",
+          stories: [],
+          matches: [],
+        }}
+        calculateMetadata={calculateWorldCupDailyMetadataFx as any}
       />
     </>
   );
