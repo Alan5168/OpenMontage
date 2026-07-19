@@ -245,7 +245,12 @@ export const project = (proj: GeoProjection, lonLat: [number, number]): [number,
   return p ?? [NaN, NaN];
 };
 
-/** Frequently used places (lon, lat). */
+/**
+ * Frequently used places (lon, lat).
+ * RULE (producer diagnosis 2026-07-18 §1.2): every MapMarker in a scene MUST
+ * take its lonLat from this registry — no bare coordinate literals in scenes.
+ * New entries carry a source note.
+ */
 export const PLACES = {
   london: [-0.13, 51.51] as [number, number],
   calcutta: [88.36, 22.57] as [number, number],
@@ -260,4 +265,28 @@ export const PLACES = {
   foochow: [119.3, 26.08] as [number, number],
   ningpo: [121.55, 29.87] as [number, number],
   shanghai: [121.47, 31.23] as [number, number],
+  /** Chuenpi (穿鼻/沙角) — island/fort at the outer Bocca Tigris; the
+   * Nov 1839 Volage/Hyacinth–Kuan Tien-pei engagement ("Battle of Chuenpi")
+   * was fought in the anchorage off it. Point sits in the estuary channel. */
+  chuenpi: [113.64, 22.75] as [number, number],
+  /** RN position off Chuenpi, Nov 1839 — schematic water point SE of the
+   * fort in the main estuary channel (approach from Macao roads). */
+  chuenpiAnchorage: [113.7, 22.62] as [number, number],
+  /** Nanking (Nanjing) on the Yangtze — where the 1842 treaty was signed
+   * aboard HMS Cornwallis. */
+  nanking: [118.78, 32.06] as [number, number],
+  /** Industrial petition cities, 1813 charter fight (standard city coords). */
+  manchester: [-2.24, 53.48] as [number, number],
+  liverpool: [-2.99, 53.41] as [number, number],
+  glasgow: [-4.25, 55.86] as [number, number],
+  /** Peking (Beijing) — the court issuing the opium edicts. */
+  peking: [116.4, 39.9] as [number, number],
+  /** Humen (虎门) town/fort on the east bank of the Bocca Tigris — site of
+   * the Jun 1839 public destruction of the surrendered chests. */
+  humen: [113.64, 22.82] as [number, number],
+  /** Cape of Good Hope — the "east of Africa" monopoly boundary marker. */
+  capeGoodHope: [18.47, -34.36] as [number, number],
+  /** Schematic open-water point in the South China Sea — arrow origin for
+   * "smuggling keeps flowing" flows at country-scale zoom (not a real port). */
+  southChinaSea: [117.5, 20.0] as [number, number],
 } as const;

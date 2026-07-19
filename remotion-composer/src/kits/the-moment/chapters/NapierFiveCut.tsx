@@ -44,7 +44,7 @@ const RiverBase: React.FC<{ children?: React.ReactNode }> = ({ children }) => (
   </svg>
 );
 
-const Frigate: React.FC<{ x: number; y: number; angle?: number; dim?: boolean }> = ({
+export const Frigate: React.FC<{ x: number; y: number; angle?: number; dim?: boolean }> = ({
   x,
   y,
   angle = 0,
@@ -262,6 +262,128 @@ export interface NapierFiveCutProps {
   place?: string;
   date?: string;
 }
+
+/**
+ * NapierContinuous — the same five story beats as ONE continuous scene.
+ *
+ * Why: the v2 read delivers all five phrases in ~8s of VO; five hard cuts
+ * there run <2s each (CEO CP2 feedback #7 "太抽象看不懂" + producer
+ * diagnosis §2, 4.3s/拍 already over the line). Instead of cutting, the
+ * frigate itself plays the story on one river stage — sail up, batteries
+ * flash, the pulse over the ship flatlines, the ship turns back dimmed,
+ * the date pin and terminated life-line land at Macao. Event times are
+ * fractions of totalSeconds so compose can pin them to VO phrase offsets.
+ */
+export interface NapierContinuousProps {
+  totalSeconds?: number;
+  name?: string;
+  place?: string;
+  date?: string;
+  /** event start times as fractions of the total window [advance, batteries, fever, retreat, death] */
+  eventFractions?: [number, number, number, number, number];
+}
+
+export const NapierContinuous: React.FC<NapierContinuousProps> = ({
+  totalSeconds = 20,
+  name = "Lord Napier",
+  place = "Macao",
+  date = "OCT 1834",
+  eventFractions = [0.0, 0.3, 0.42, 0.58, 0.78],
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const total = totalSeconds * fps;
+  const [fAdv, fBat, fFev, fRet, fDeath] = eventFractions.map((f) => f * total);
+
+  // ship track: up-river (Canton-ward) then back down, dimming after fever
+  const up = interpolate(frame, [fAdv, fBat], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const down = interpolate(frame, [fRet, fDeath], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const x = 1330 - 260 * up + 320 * down;
+  const y = 800 - 210 * up + 260 * down;
+  const dim = frame >= fFev;
+
+  // battery muzzle flashes (two bursts, then done — not a loop)
+  const flash = (start: number) =>
+    interpolate(frame - start, [0, 5, 14], [0, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+
+  // fever pulse directly above the ship, flatlining; exits during retreat
+  // so it never lingers into the death plate
+  const pulseIn = spring({ frame: Math.max(0, frame - fFev), fps, config: TM.spring });
+  const pulseOut = interpolate(frame, [fRet, fRet + 16], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const pulseOpacity = pulseIn * pulseOut;
+  const flat = interpolate(frame, [fFev + 20, fRet], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const amp = 26 * (1 - flat);
+  const px = x - 130;
+  const py = y - 90;
+  const pulse = `M ${px} ${py} L ${px + 70} ${py} L ${px + 92} ${py - amp} L ${px + 114} ${py + amp} L ${px + 136} ${py} L ${px + 200} ${py} L ${px + 218} ${py - amp * 0.7} L ${px + 236} ${py + amp * 0.7} L ${px + 260} ${py}`;
+
+  const death = spring({ frame: Math.max(0, frame - fDeath), fps, config: TM.spring });
+  const bar = spring({ frame: Math.max(0, frame - fDeath - 14), fps, config: { damping: 15, stiffness: 240, mass: 0.7 } });
+
+  // caption strip follows the phase (one label at a time, VO-aligned)
+  const phase =
+    frame >= fDeath ? "Death at Macao" : frame >= fRet ? "Retreat" : frame >= fFev ? "Fever aboard" : frame >= fBat ? "Shore batteries answer" : "Frigates, upriver";
+  const phaseN = frame >= fDeath ? 5 : frame >= fRet ? 4 : frame >= fFev ? 3 : frame >= fBat ? 2 : 1;
+
+  return (
+    <PaperBackground>
+      <RiverBase>
+        <Frigate x={x} y={y} angle={up < 1 && down === 0 ? -28 : down > 0 ? 24 : 0} dim={dim} />
+        <Frigate x={x + 90} y={y + 80} angle={up < 1 && down === 0 ? -28 : down > 0 ? 24 : 0} dim={dim} />
+        {frame >= fBat &&
+          [0, 10].map((d, i) => (
+            <g key={i} transform={`translate(${1062 + i * 40}, ${520 - i * 10})`} opacity={flash(fBat + d)}>
+              <path
+                d="M 0 -18 L 5 -5 L 18 0 L 5 5 L 0 18 L -5 5 L -18 0 L -5 -5 Z"
+                fill={TM.qingYellow}
+                stroke={TM.ink}
+                strokeWidth={2.5}
+              />
+            </g>
+          ))}
+        {frame >= fFev && pulseOpacity > 0.01 && (
+          <>
+            <path d={pulse} fill="none" stroke={TM.britishRed} strokeWidth={5} opacity={pulseOpacity} />
+            <text
+              x={px + 130}
+              y={py - 44}
+              textAnchor="middle"
+              fontFamily={TM.fontMono}
+              fontSize={26}
+              letterSpacing="0.2em"
+              fill={TM.britishRed}
+              opacity={pulseOpacity}
+            >
+              FEVER — the line goes flat
+            </text>
+          </>
+        )}
+        {frame >= fDeath && (
+          <g transform="translate(1400, 900)" opacity={death}>
+            <circle r={11} fill={TM.inkSoft} stroke={TM.ink} strokeWidth={3} />
+            <text x={26} y={8} fontFamily={TM.fontBody} fontWeight={600} fontSize={28} fill={TM.ink}>
+              {place}
+            </text>
+          </g>
+        )}
+      </RiverBase>
+      {frame >= fDeath && (
+        <>
+          <UIDate date={date} x={1290} y={640} delay={0} />
+          <div style={{ position: "absolute", left: 340, top: 420, opacity: death }}>
+            <div style={{ fontFamily: TM.fontHeading, fontWeight: 700, fontSize: 64, color: TM.ink }}>{name}</div>
+            <svg width={520} height={40}>
+              <line x1={0} y1={20} x2={430 * bar} y2={20} stroke={TM.inkSoft} strokeWidth={5} />
+              {bar >= 1 && <line x1={430} y1={2} x2={430} y2={38} stroke={TM.britishRed} strokeWidth={6} />}
+            </svg>
+          </div>
+        </>
+      )}
+      <CutLabel n={phaseN} text={phase} />
+      <UISchematic />
+    </PaperBackground>
+  );
+};
 
 export const NapierFiveCut: React.FC<NapierFiveCutProps> = ({
   totalSeconds = 34,

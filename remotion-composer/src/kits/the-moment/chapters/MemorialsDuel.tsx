@@ -22,6 +22,9 @@ export interface MemorialsDuelProps {
   left: MemorialCard; // e.g. 1836 Xu Naiji — legalize
   right: MemorialCard; // e.g. 1838 Huang Juezi — death penalty
   title?: string;
+  /** frames before the right plate enters (waveform-timed beats pass the
+   * measured VO pause; default keeps the old near-simultaneous demo look) */
+  rightDelayFrames?: number;
 }
 
 /**
@@ -29,14 +32,19 @@ export interface MemorialsDuelProps {
  * Vertical scroll-plates in Qing document grammar — schematic vertical
  * rule lines, NOT a facsimile of real memorial manuscripts (no fake scans).
  */
-export const MemorialsDuel: React.FC<MemorialsDuelProps> = ({ left, right, title }) => {
+export const MemorialsDuel: React.FC<MemorialsDuelProps> = ({
+  left,
+  right,
+  title,
+  rightDelayFrames = 18,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const enter = spring({ frame, fps, config: TM.spring });
 
   const plate = (m: MemorialCard, side: "left" | "right") => {
     const p = spring({
-      frame: Math.max(0, frame - (side === "left" ? 6 : 18)),
+      frame: Math.max(0, frame - (side === "left" ? 6 : rightDelayFrames)),
       fps,
       config: TM.spring,
     });
@@ -73,7 +81,10 @@ export const MemorialsDuel: React.FC<MemorialsDuelProps> = ({ left, right, title
           </div>
           {m.points.map((pt, i) => {
             const pp = spring({
-              frame: Math.max(0, frame - 30 - i * 6 - (side === "right" ? 12 : 0)),
+              frame: Math.max(
+                0,
+                frame - i * 6 - (side === "right" ? rightDelayFrames + 24 : 30)
+              ),
               fps,
               config: TM.spring,
             });

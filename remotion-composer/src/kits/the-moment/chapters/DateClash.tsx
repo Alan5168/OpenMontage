@@ -80,13 +80,17 @@ export const DateClash: React.FC<DateClashProps> = ({
             />
           </div>
           {wrongCaption ? (
+            // caption exits as the strike lands — it otherwise collides with
+            // the verdict chip during the strike→slam window
             <div
               style={{
                 fontFamily: TM.fontBody,
                 fontSize: 30,
                 color: TM.inkSoft,
                 marginTop: 8,
-                opacity: interpolate(slam, [0, 1], [1, 0.5]),
+                opacity: interpolate(strike, [0, 0.6], [1, 0], {
+                  extrapolateRight: "clamp",
+                }),
               }}
             >
               {wrongCaption}

@@ -50,10 +50,12 @@ export const D_DEMO_PROPS = {
       accent: TM.britishRed,
     },
   },
+  // hedge is EN-only: EN/ZH are independent tracks, never bilingual on one
+  // screen (producer diagnosis 2026-07-18 §1.1)
   replyCount: {
     total: 29,
     minority: 8,
-    hedge: "By the count historians usually give — 据史家通行的统计",
+    hedge: "By the count historians usually give",
     minorityLabel: "for the death penalty",
     majorityLabel: "provincial replies",
     highlightLabel: "Lin Zexu",
@@ -64,7 +66,7 @@ export const D_DEMO_PROPS = {
     attribution: "Lin Zexu — memorial to the throne",
     context: "1838",
     kind: "paraphrase" as const,
-    tagText: "WORDS TO THIS EFFECT · 大意转述",
+    tagText: "WORDS TO THIS EFFECT",
     accent: TM.britishRed,
   },
   neverDelivered: {
@@ -111,10 +113,12 @@ export const D_DEMO_PROPS = {
     ayes: 262,
     date: "APRIL 1840",
   },
+  // wording corrected per producer_cp1_checkpoint_ep1_20260718.md ruling #1
+  // (Hansard 1840-04-07 motion verbatim; "present" hosts on "advisers")
   present: {
-    before: "…the conduct of the",
+    before: "…on the part of her Majesty's",
     inserted: "present",
-    after: "Government…",
+    after: "advisers…",
     note: "inserted mid-debate — so the censure couldn't touch future policy, or the Tory ministers who'd run China before",
   },
   winners: [

@@ -10,7 +10,15 @@ import { UIQuote } from "../ui/UIQuote";
 import { UIWire } from "../ui/UIWire";
 import { UIStamp } from "../ui/UIStamp";
 import { UISchematic } from "../ui/UISchematic";
-import { MapTriangle, MapCantonApproach, MapTreatyPorts, MapPearl } from "../map/scenes";
+import {
+  MapTriangle,
+  MapCantonApproach,
+  MapTreatyPorts,
+  MapPearl,
+  MapMonopolyZone,
+  MapPetitionCities,
+  MapSplit1813,
+} from "../map/scenes";
 import { SetShell } from "../set/sets";
 import { CharPunch } from "../char/CharPunch";
 import { ExecutionDate } from "../chapters/ExecutionDate";
@@ -72,36 +80,30 @@ const CH1_BEATS: TimedBeat[] = [
   { from: 14.0, to: 22.0, name: "C1-3 bigger than the King's", node: (
       <UIBigNum kicker="A PRIVATE ARMY" value="200,000" qualifier="strong — bigger than the King's" accent={TM.britishRed} />
     ) },
+  // map-share batch 1 (night run 07-19): "all trade east of Africa" is a
+  // geographic claim — drawn as the monopoly zone, not told as a date pin
   { from: 22.0, to: 32.8, name: "C1-4 one firm, one street", node: (
-      <SetShell set="SET-LEDGER">
-        <UIDate date="SINCE 1600" event="royal monopoly — all trade east of Africa" x={110} y={90} delay={6} />
-        <UISchematic />
-      </SetShell>
+      <MapMonopolyZone title="All trade east of Africa — one firm's, by law" date="SINCE 1600" />
     ) },
   { from: 32.8, to: 46.5, name: "C1-5 1813 — 130 petitions", node: (
       <UIBigNum kicker="1813 · CHARTER RENEWAL" value="130" qualifier="petitions — half of industrial Britain wanted the monopoly dead" accent={TM.qingBlue} />
     ) },
+  // map-share batch 1: petition wave drawn as converging arcs on Westminster
+  // (route_arc grammar) — replaces the three-merchant puppet row
   { from: 46.5, to: 59.43, name: "C1-6 the cities at the door", node: (
-      <PaperBackground>
-        <CharPunch puppet="CHAR-MERCHANT" label="Manchester" x={480} y={880} height={430} delay={4} idle={false} />
-        <CharPunch puppet="CHAR-MERCHANT" label="Liverpool" x={960} y={880} height={430} delay={12} idle={false} />
-        <CharPunch puppet="CHAR-MERCHANT" label="Glasgow" x={1440} y={880} height={430} delay={20} idle={false} flip />
-        <UISchematic />
-      </PaperBackground>
+      <MapPetitionCities title="The cities at the door" date="1813 · 130 PETITIONS" />
     ) },
+  // map-share batch 1: the 1813 split shown as two region states
   { from: 59.43, to: 67.2, name: "C1-7 India open, China locked", node: (
-      <UICompare
-        title="THE 1813 SPLIT"
-        leftTitle="India"
-        rightTitle="China"
-        leftItems={["monopoly broken", "a subcontinent's trade thrown open"]}
-        rightItems={["untouched", "the monopoly survives"]}
-        leftAccent={TM.qingBlue}
-        rightAccent={TM.britishRed}
-      />
+      <MapSplit1813 title="The 1813 split" date="INDIA OPEN · CHINA LOCKED" />
     ) },
-  { from: 67.2, to: 92.9, name: "C1-8 the tea pillar", node: (
-      <UIBigNum kicker="WHY CHINA SURVIVED · TEA" value="1/6" qualifier="of the combined revenue of Britain and India — no Chancellor gambles that on an ideology" accent={TM.qingYellow} />
+  // §3.10 waveform fix (night run 07-19): 25.7s static card split at the
+  // measured VO pause 67.2+10.10s — number first, verdict second
+  { from: 67.2, to: 77.3, name: "C1-8a the tea pillar — the number", node: (
+      <UIBigNum kicker="WHY CHINA SURVIVED · TEA" value="1/6" qualifier="of the combined revenue of Britain and India" accent={TM.qingYellow} />
+    ) },
+  { from: 77.3, to: 92.9, name: "C1-8b no Chancellor gambles", node: (
+      <UIBigNum kicker="ONE POUND IN SIX" value="NO CHANCELLOR" qualifier="gambles that on an ideology" accent={TM.qingYellow} />
     ) },
   { from: 92.9, to: 97.5, name: "C1-9 twenty-year timer", node: (
       <UIBigNum kicker="THE SURVIVING MONOPOLY" value="20 YEARS" qualifier="on a timer" accent={TM.inkSoft} />
@@ -475,10 +477,13 @@ const EP_BEATS: TimedBeat[] = [
   { from: 53.25, to: 70.08, name: "EP-3 no villain", node: (
       <UIBigNum kicker="NO MASTER PLAN" value="NO VILLAIN" qualifier="a market with no brake, a debt with no payer, a government nine votes from the exit" accent={TM.inkSoft} />
     ) },
+  // §3.10 waveform fix (night run 07-19): the surgeon now enters on the
+  // measured VO pause at +15.5s (frame ≈ 470) — the 24s shot changes state
+  // mid-way instead of front-loading both puppets
   { from: 70.08, to: 94.07, name: "EP-4 the thread left hanging", node: (
       <PaperBackground>
         <CharPunch puppet="CHAR-MERCHANT" label="Parsi merchants out of Bombay" x={760} y={880} height={470} delay={8} idle={false} />
-        <CharPunch puppet="CHAR-SAILOR" label="a 19-year-old surgeon, first sailing east" x={1220} y={880} height={470} delay={22} idle={false} flip />
+        <CharPunch puppet="CHAR-SAILOR" label="a 19-year-old surgeon, first sailing east" x={1220} y={880} height={470} delay={470} idle={false} flip />
         <UISchematic />
       </PaperBackground>
     ) },

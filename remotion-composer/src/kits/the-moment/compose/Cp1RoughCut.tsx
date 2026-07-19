@@ -12,13 +12,18 @@ import { UICompare } from "../ui/UICompare";
 import { UIQuote } from "../ui/UIQuote";
 import { UIWire } from "../ui/UIWire";
 import { UISchematic } from "../ui/UISchematic";
-import { MapTreatyPorts, MapPearl } from "../map/scenes";
+import {
+  MapTreatyPorts,
+  MapPearl,
+  MapQingBans,
+  MapHumen,
+  MapLetterRoute,
+} from "../map/scenes";
 import { SetShell } from "../set/sets";
 import { CharPunch } from "../char/CharPunch";
 import { DateClash } from "../chapters/DateClash";
 import { MemorialsDuel } from "../chapters/MemorialsDuel";
 import { ReplyCount } from "../chapters/ReplyCount";
-import { NeverDelivered } from "../chapters/NeverDelivered";
 import { TallyBoard, PresentInsertion } from "../chapters/TallyBoard";
 
 /**
@@ -159,21 +164,20 @@ const CH5_BEATS: TimedBeat[] = [
     from: 11.2,
     to: 24.0,
     name: "C5-2 banned for a century",
-    node: (
-      <UIBigNum
-        kicker="OPIUM BANNED FOR OVER A CENTURY"
-        value="1729"
-        qualifier="the first edict — and the bans kept failing"
-        accent={TM.qingBlue}
-      />
-    ),
+    // map-share batch 1 (night run 07-19): failing edicts drawn as map state
+    // — BANNED plates strike and fade while the smuggling arrow keeps flowing
+    node: <MapQingBans title="Banned for over a century" date="1729 · THE FIRST EDICT" />,
   },
   {
     from: 24.0,
     to: 53.49,
     name: "C5-3 two memorials, one desk",
+    // §3.10 waveform fix (night run 07-19): Huang's plate holds until the
+    // measured 1.03s VO pause at +15.35s (frame ≈ 460) — the 29.5s single
+    // shot now carries an in-shot state change instead of a static duel
     node: (
       <MemorialsDuel
+        rightDelayFrames={462}
         title="TWO MEMORIALS · ONE DESK"
         left={{
           year: "1836",
@@ -282,27 +286,17 @@ const CH5_BEATS: TimedBeat[] = [
     from: 123.3,
     to: 145.49,
     name: "C5-8 Humen — 20,000+ chests",
-    node: (
-      <UIBigNum
-        kicker="HUMEN · 1839"
-        value="20,000+"
-        qualifier="chests surrendered and destroyed in public — the largest drug seizure in history, before or since"
-        accent={TM.opiumPurple}
-      />
-    ),
+    // map-share batch 1: the seizure drawn as chests converging on Humen;
+    // the 20,000+ ledger number survives as the corner plate
+    node: <MapHumen title="Humen — destroyed in public" date="JUN 1839" />,
   },
   {
     from: 145.49,
     to: 173.26,
     name: "C5-9 the letter never delivered",
-    node: (
-      <NeverDelivered
-        fromLabel="Canton — Commissioner Lin"
-        toLabel="Queen Victoria"
-        endLabel="London papers — a curiosity"
-        stampText="NEVER DELIVERED"
-      />
-    ),
+    // map-share batch 1: the letter's failed route drawn Canton→Cape→London
+    // with the NEVER DELIVERED strike (replaces the abstract wire diagram)
+    node: <MapLetterRoute title="The letter to Queen Victoria" date="1839" />,
   },
   {
     from: 173.26,

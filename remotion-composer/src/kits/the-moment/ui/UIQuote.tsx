@@ -58,7 +58,9 @@ export const UIQuote: React.FC<UIQuoteProps> = ({
       : "PARAPHRASE");
 
   return (
-    <PaperBackground tone="hi">
+    // real paper-texture ambience (CEO #14); typesetting + honesty tag stay —
+    // texture layer only, never a facsimile
+    <PaperBackground tone="hi" textureSrc="the-moment/textures/paper_quote.jpg">
       <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
         <div style={{ maxWidth: 1360, position: "relative" }}>
           <div

@@ -31,6 +31,12 @@ export interface FourReadingsProps {
   n4: ReadingPanel & { fromRate: string; toRate: string }; // exchange
   /** which panels are lit (for building the chapter progressively); default all */
   activeCount?: number;
+  /**
+   * Page-flip mode (CEO CP2 feedback #10: one page per narration beat, not
+   * four panels at once): render ONLY this panel, centered and enlarged.
+   * Grid mode (focus undefined) stays for the end-of-chapter recap.
+   */
+  focus?: 1 | 2 | 3 | 4;
 }
 
 const PANEL_W = 860;
@@ -92,36 +98,51 @@ export const FourReadings: React.FC<FourReadingsProps> = ({
   n3,
   n4,
   activeCount = 4,
+  focus,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const intro = spring({ frame, fps, config: TM.spring });
-  const D = [10, 34, 58, 82]; // per-panel delays
+  // grid mode staggers panels; focus mode enters its single panel immediately
+  const D = focus ? [4, 4, 4, 4] : [10, 34, 58, 82];
 
-  const X0 = (1920 - PANEL_W * 2 - 60) / 2;
-  const Y0 = 140;
+  // focus mode: the chosen panel sits alone, centered and scaled up; the
+  // other panels are skipped entirely (page-flip grammar)
+  const FOCUS_SCALE = 1.55;
+  const X0 = focus ? (1920 - PANEL_W) / 2 : (1920 - PANEL_W * 2 - 60) / 2;
+  const Y0 = focus ? (1080 - PANEL_H) / 2 + 20 : 140;
+  const show = (n: 1 | 2 | 3 | 4) => (focus ? focus === n : activeCount >= n);
+  const pos = (n: 1 | 2 | 3 | 4): { x: number; y: number } =>
+    focus
+      ? { x: X0, y: Y0 }
+      : {
+          x: n % 2 === 1 ? X0 : X0 + PANEL_W + 60,
+          y: n <= 2 ? Y0 : Y0 + PANEL_H + 44,
+        };
 
-  return (
-    <PaperBackground>
-      <div
-        style={{
-          position: "absolute",
-          top: 72,
-          width: "100%",
-          textAlign: "center",
-          fontFamily: TM.fontMono,
-          fontSize: 28,
-          letterSpacing: "0.26em",
-          color: TM.inkSoft,
-          opacity: intro,
-        }}
-      >
-        FOUR READINGS · PARALLEL — NOT A CHAIN
-      </div>
+  const header = (
+    <div
+      style={{
+        position: "absolute",
+        top: 72,
+        width: "100%",
+        textAlign: "center",
+        fontFamily: TM.fontMono,
+        fontSize: 28,
+        letterSpacing: "0.26em",
+        color: TM.inkSoft,
+        opacity: intro,
+      }}
+    >
+      {focus ? `FOUR READINGS · ${focus} OF 4` : "FOUR READINGS · PARALLEL — NOT A CHAIN"}
+    </div>
+  );
 
+  const inner = (
+    <>
       {/* N1 price: two endpoints + dashed gap, no smooth curve */}
-      {activeCount >= 1 && (
-        <PanelShell p={n1} x={X0} y={Y0} delay={D[0]} accent={TM.opiumPurple}>
+      {show(1) && (
+        <PanelShell p={n1} x={pos(1).x} y={pos(1).y} delay={D[0]} accent={TM.opiumPurple}>
           {(() => {
             const p = spring({ frame: Math.max(0, frame - D[0] - 10), fps, config: TM.springSlow });
             const x1 = 150, y1 = 150, x2 = PANEL_W - 150, y2 = 320;
@@ -160,8 +181,8 @@ export const FourReadings: React.FC<FourReadingsProps> = ({
       )}
 
       {/* N2 volume: two bars */}
-      {activeCount >= 2 && (
-        <PanelShell p={n2} x={X0 + PANEL_W + 60} y={Y0} delay={D[1]} accent={TM.qingBlue}>
+      {show(2) && (
+        <PanelShell p={n2} x={pos(2).x} y={pos(2).y} delay={D[1]} accent={TM.qingBlue}>
           {(() => {
             const p = spring({ frame: Math.max(0, frame - D[1] - 10), fps, config: TM.springSlow });
             // keep bar labels clear of the headline row (no overlap at full height)
@@ -189,8 +210,8 @@ export const FourReadings: React.FC<FourReadingsProps> = ({
       )}
 
       {/* N3 silver: big number + outflow glyph */}
-      {activeCount >= 3 && (
-        <PanelShell p={n3} x={X0} y={Y0 + PANEL_H + 44} delay={D[2]} accent={TM.silver}>
+      {show(3) && (
+        <PanelShell p={n3} x={pos(3).x} y={pos(3).y} delay={D[2]} accent={TM.silver}>
           {(() => {
             const p = spring({ frame: Math.max(0, frame - D[2] - 10), fps, config: TM.springSlow });
             return (
@@ -213,8 +234,8 @@ export const FourReadings: React.FC<FourReadingsProps> = ({
       )}
 
       {/* N4 exchange: conversion strip */}
-      {activeCount >= 4 && (
-        <PanelShell p={n4} x={X0 + PANEL_W + 60} y={Y0 + PANEL_H + 44} delay={D[3]} accent={TM.britishRed}>
+      {show(4) && (
+        <PanelShell p={n4} x={pos(4).x} y={pos(4).y} delay={D[3]} accent={TM.britishRed}>
           {(() => {
             const p = spring({ frame: Math.max(0, frame - D[3] - 10), fps, config: TM.springSlow });
             return (
@@ -232,6 +253,24 @@ export const FourReadings: React.FC<FourReadingsProps> = ({
             );
           })()}
         </PanelShell>
+      )}
+    </>
+  );
+
+  return (
+    <PaperBackground>
+      {header}
+      {focus ? (
+        <AbsoluteFill
+          style={{
+            transform: `scale(${FOCUS_SCALE})`,
+            transformOrigin: "center 58%",
+          }}
+        >
+          {inner}
+        </AbsoluteFill>
+      ) : (
+        inner
       )}
     </PaperBackground>
   );
