@@ -15,6 +15,9 @@ export interface UIStampProps {
   rotation?: number;
   scale?: number;
   delay?: number;
+  /** paper chip behind the stamp — for legibility over busy plates
+   * (engraving heroes); default off so existing scenes are unchanged */
+  backing?: boolean;
 }
 
 const PRESET: Record<
@@ -41,6 +44,7 @@ export const UIStamp: React.FC<UIStampProps> = ({
   rotation = -12,
   scale = 1,
   delay = 0,
+  backing = false,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -69,6 +73,7 @@ export const UIStamp: React.FC<UIStampProps> = ({
           borderRadius: 10,
           padding: "14px 34px",
           textAlign: "center",
+          backgroundColor: backing ? "rgba(246,239,223,0.88)" : undefined,
           // subtle uneven-ink effect without faking an aged document
           boxShadow: `inset 0 0 22px rgba(42,36,28,0.12)`,
         }}

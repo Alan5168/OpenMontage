@@ -21,6 +21,11 @@ import {
 } from "../map/scenes";
 import { SetShell } from "../set/sets";
 import { CharPunch } from "../char/CharPunch";
+import { EngravingScene } from "../engraving/EngravingScene";
+import { PinPulled } from "../metaphor/PinPulled";
+import { ChestsDestroyed } from "../metaphor/ChestsDestroyed";
+import { ShieldNineVotes } from "../metaphor/ShieldNineVotes";
+import { UIStamp } from "../ui/UIStamp";
 import { DateClash } from "../chapters/DateClash";
 import { MemorialsDuel } from "../chapters/MemorialsDuel";
 import { ReplyCount } from "../chapters/ReplyCount";
@@ -61,16 +66,92 @@ interface TimedBeat {
   node: React.ReactNode;
 }
 
+/** chapter card set over an engraving hero (CP3: C7-1 opens in the chamber) */
+const ChapterOverlay: React.FC<{ kicker: string; title: string; subtitle?: string }> = ({
+  kicker,
+  title,
+  subtitle,
+}) => (
+  <div
+    style={{
+      position: "absolute",
+      inset: 0,
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
+      textAlign: "center",
+      backgroundColor: "rgba(28,24,18,0.34)",
+    }}
+  >
+    <div style={{ fontFamily: TM.fontMono, fontSize: 30, letterSpacing: "0.3em", color: TM.paperHi, opacity: 0.85 }}>
+      {kicker}
+    </div>
+    <div style={{ fontFamily: TM.fontHeading, fontWeight: 800, fontSize: 130, color: TM.paperHi, marginTop: 14, textShadow: "0 4px 22px rgba(28,24,18,0.6)" }}>
+      {title}
+    </div>
+    {subtitle ? (
+      <div style={{ fontFamily: TM.fontMono, fontSize: 27, letterSpacing: "0.14em", color: TM.paperHi, opacity: 0.8, marginTop: 18 }}>
+        {subtitle}
+      </div>
+    ) : null}
+  </div>
+);
+
 /* ------------------------------------------------------------------ */
 /* Cold Open — 83.18s                                                  */
 /* chunk starts: 0.00 / 23.69 / 25.84 / 35.90 / 67.03 / 79.55          */
 /* ------------------------------------------------------------------ */
 
+// CP3-N1 density recut (producer_cp3_correction_list §3, CEO ≤2 sentences/cut):
+// CO 6 beats -> 12 perceptible states; sub-beat boundaries by char-share
+// interpolation inside manifest chunks (±2s scratch tolerance holds).
 const CO_BEATS: TimedBeat[] = [
   {
     from: 0,
+    to: 4.9,
+    name: "CO-1a a British warship off Nanking",
+    node: (
+      <EngravingScene
+        src="the-moment/engravings/ship_hms_wellesley.jpg"
+        kenBurns={{ scaleFrom: 1.3, scaleTo: 1.14, yFrom: -3, yTo: 0 }}
+        duotone={0.9}
+        sourceLabel="RMG PU5981 · public domain"
+      >
+        <UIDate date="AUG 1842" event="off Nanking" x={110} y={90} delay={4} />
+      </EngravingScene>
+    ),
+  },
+  {
+    from: 4.9,
+    to: 14.4,
+    name: "CO-1b signing away — three stamps",
+    node: (
+      <EngravingScene
+        src="the-moment/engravings/ship_hms_wellesley.jpg"
+        kenBurns={{ scaleFrom: 1.5, scaleTo: 1.62, xFrom: -4, xTo: 3, yFrom: -4, yTo: -6 }}
+        duotone={0.9}
+        sourceLabel="RMG PU5981 · public domain"
+      >
+        <UIStamp kind="custom" text="FIVE PORTS" x={560} y={380} rotation={-9} delay={26} backing />
+        <UIStamp kind="custom" text="HONG KONG" x={1030} y={560} rotation={5} delay={86} backing />
+        <UIStamp
+          kind="custom"
+          text="21,000,000"
+          subtext="SILVER DOLLARS"
+          x={1440}
+          y={760}
+          rotation={-6}
+          delay={150}
+          backing
+        />
+      </EngravingScene>
+    ),
+  },
+  {
+    from: 14.4,
     to: 22.6,
-    name: "CO-1 textbook 1842 — Nanking treaty map",
+    name: "CO-1c the textbook picture — treaty map",
     node: (
       // campaign route arcs animate HK→Amoy→Ningpo→Shanghai→Nanking
       // (route_arc P0; CEO CP2 feedback #1)
@@ -93,24 +174,90 @@ const CO_BEATS: TimedBeat[] = [
       />
     ),
   },
+  // CO-3 (was ONE 17.4s puppet scene — the CEO screenshot pain) -> proto
+  // grammar promoted: 4 states, 1 sentence each (Proto1813Density S1–S4)
   {
     from: 35.9,
-    to: 53.3,
-    name: "CO-3 Westminster — a room of men",
+    to: 39.3,
+    name: "CO-3a no fleet, no emperor",
     node: (
-      <SetShell set="SET-COMMONS">
-        <UIDate date="1813" event="a vote about India" x={110} y={90} delay={6} />
-        <CharPunch puppet="CHAR-MP" x={760} y={900} height={400} delay={14} idle={false} />
-        <CharPunch puppet="CHAR-MP" x={1160} y={900} height={400} delay={20} idle={false} flip />
-        <UISchematic />
-      </SetShell>
+      <EngravingScene
+        src="the-moment/engravings/ship_hms_wellesley.jpg"
+        kenBurns={{ scaleFrom: 1.25, scaleTo: 1.12, yFrom: -2, yTo: 0 }}
+        duotone={0.9}
+        sourceLabel="RMG PU5981 · public domain"
+      >
+        <UIStamp kind="custom" text="NO FLEET" x={620} y={430} rotation={-10} delay={8} />
+        <UIStamp kind="custom" text="NO EMPEROR" x={1240} y={640} rotation={6} delay={38} />
+      </EngravingScene>
     ),
   },
   {
+    from: 39.3,
+    to: 45.5,
+    name: "CO-3b a room of men in Westminster",
+    node: (
+      <EngravingScene
+        src="the-moment/engravings/commons_house_1833.jpg"
+        kenBurns={{ scaleFrom: 1.05, scaleTo: 1.28, yFrom: 0, yTo: -3 }}
+        duotone={0.8}
+        spotlight={{ xFrom: 560, xTo: 1340, y: 560, r: 620 }}
+        sourceLabel="Hayter, The House of Commons 1833 · public domain"
+      >
+        <UIDate date="1813" event="a vote about India" x={110} y={90} delay={6} />
+      </EngravingScene>
+    ),
+  },
+  {
+    from: 45.5,
+    to: 49.3,
+    name: "CO-3c couldn't find Canton",
+    node: (
+      <EngravingScene
+        src="the-moment/engravings/commons_house_1833.jpg"
+        kenBurns={{ scaleFrom: 1.6, scaleTo: 1.75, xFrom: 6, xTo: -4, yFrom: -6, yTo: -8 }}
+        duotone={0.8}
+        sourceLabel="Hayter, The House of Commons 1833 · public domain"
+      >
+        <UIStamp
+          kind="custom"
+          text="COULDN'T FIND CANTON"
+          subtext="ON A MAP"
+          x={960}
+          y={780}
+          rotation={-6}
+          delay={20}
+          backing
+        />
+      </EngravingScene>
+    ),
+  },
+  {
+    from: 49.3,
+    to: 53.3,
+    name: "CO-3d the first pin pulled",
+    node: <PinPulled />,
+  },
+  {
     from: 53.3,
-    to: 67.03,
-    name: "CO-4 27 years later — shells on war junks",
+    to: 57.1,
+    name: "CO-4a 27 years to come apart",
     node: <MapPearl title="The Pearl River — 27 years later" date="NOV 1839" />,
+  },
+  {
+    from: 57.1,
+    to: 67.03,
+    name: "CO-4b shells falling on war junks",
+    node: (
+      <EngravingScene
+        src="the-moment/engravings/ship_nemesis.jpg"
+        kenBurns={{ scaleFrom: 1.08, scaleTo: 1.3, xFrom: 2, xTo: -3, yFrom: 1, yTo: -2 }}
+        duotone={0.75}
+        sourceLabel="E. Duncan, 1843 · public domain"
+      >
+        <UIDate date="BY THE END" event="Royal Navy shells on Chinese war junks" x={110} y={90} delay={10} />
+      </EngravingScene>
+    ),
   },
   {
     from: 67.03,
@@ -147,6 +294,30 @@ const CO_BEATS: TimedBeat[] = [
 /* chunk starts: 0.00 / 53.49 / 86.40 / 145.49 / 170.89 / 173.26       */
 /* ------------------------------------------------------------------ */
 
+const XU_MEMORIAL = {
+  year: "1836",
+  author: "Xu Naiji",
+  position: "Legalize it",
+  points: [
+    "You cannot stop this trade",
+    "Tax it — keep the silver home",
+    "Run the market instead of fighting it",
+  ],
+  accent: TM.qingBlue,
+};
+
+const HUANG_MEMORIAL = {
+  year: "1838",
+  author: "Huang Juezi",
+  position: "Death penalty",
+  points: [
+    "One year for every smoker to quit",
+    "After that — execution",
+    "Aimed at demand itself",
+  ],
+  accent: TM.britishRed,
+};
+
 const CH5_BEATS: TimedBeat[] = [
   {
     from: 0,
@@ -168,39 +339,31 @@ const CH5_BEATS: TimedBeat[] = [
     // — BANNED plates strike and fade while the smuggling arrow keeps flowing
     node: <MapQingBans title="Banned for over a century" date="1729 · THE FIRST EDICT" />,
   },
+  // C5-3 (was one 29.5s duel with an in-shot change) -> CP3-N1 hard split:
+  // Xu solo / Huang solo / duel recap — cut points at the measured VO pause
+  // (+15.35s) and the char-share estimate for the death-penalty payoff
   {
     from: 24.0,
+    to: 39.35,
+    name: "C5-3a Xu Naiji — legalize it",
+    node: <MemorialsDuel solo="left" left={XU_MEMORIAL} right={HUANG_MEMORIAL} />,
+  },
+  {
+    from: 39.35,
+    to: 48.5,
+    name: "C5-3b Huang Juezi — death penalty",
+    node: <MemorialsDuel solo="right" left={XU_MEMORIAL} right={HUANG_MEMORIAL} />,
+  },
+  {
+    from: 48.5,
     to: 53.49,
-    name: "C5-3 two memorials, one desk",
-    // §3.10 waveform fix (night run 07-19): Huang's plate holds until the
-    // measured 1.03s VO pause at +15.35s (frame ≈ 460) — the 29.5s single
-    // shot now carries an in-shot state change instead of a static duel
+    name: "C5-3c two memorials, one desk",
     node: (
       <MemorialsDuel
-        rightDelayFrames={462}
+        rightDelayFrames={10}
         title="TWO MEMORIALS · ONE DESK"
-        left={{
-          year: "1836",
-          author: "Xu Naiji",
-          position: "Legalize it",
-          points: [
-            "You cannot stop this trade",
-            "Tax it — keep the silver home",
-            "Run the market instead of fighting it",
-          ],
-          accent: TM.qingBlue,
-        }}
-        right={{
-          year: "1838",
-          author: "Huang Juezi",
-          position: "Death penalty",
-          points: [
-            "One year for every smoker to quit",
-            "After that — execution",
-            "Aimed at demand itself",
-          ],
-          accent: TM.britishRed,
-        }}
+        left={XU_MEMORIAL}
+        right={HUANG_MEMORIAL}
       />
     ),
   },
@@ -238,8 +401,8 @@ const CH5_BEATS: TimedBeat[] = [
   },
   {
     from: 86.4,
-    to: 100.5,
-    name: "C5-6 the emperor picks a side",
+    to: 93.5,
+    name: "C5-6a the emperor picks a side",
     node: (
       <UICompare
         title="THE EMPEROR PICKS A SIDE"
@@ -253,30 +416,91 @@ const CH5_BEATS: TimedBeat[] = [
     ),
   },
   {
-    from: 100.5,
-    to: 123.3,
-    name: "C5-7 Lin reaches Canton — Jardine gone",
+    // CP3-N1: the mandate gets its own state — W3 commissioner plate,
+    // commanding pose (hybrid track Layer D)
+    from: 93.5,
+    to: 100.5,
+    name: "C5-6b one mandate — end it",
     node: (
-      <SetShell set="SET-CANTON-FACTORY">
-        <UIDate date="MAR 1839" event="Lin reaches Canton" x={110} y={90} delay={4} />
+      <PaperBackground>
+        <UIDate date="1838" event="a commissioner's seal" x={110} y={90} delay={4} />
         <CharPunch
-          puppet="CHAR-OFFICIAL-CN"
+          puppet="CHAR-COMMISSIONER-CN"
+          pose="action"
           label="Lin Zexu — Imperial Commissioner"
-          x={700}
-          y={910}
-          height={430}
-          delay={12}
+          x={960}
+          y={900}
+          height={520}
+          delay={8}
           idle={false}
         />
+        <UIStamp kind="custom" text="END IT" x={1380} y={420} rotation={8} delay={34} />
+        <UISchematic />
+      </PaperBackground>
+    ),
+  },
+  // C5-7 (was one 22.8s two-puppet hold) -> CP3-N1: engraving arrival /
+  // the Iron-Headed Old Rat / the rat has fled
+  {
+    from: 100.5,
+    to: 109.5,
+    name: "C5-7a Lin reaches Canton",
+    node: (
+      <EngravingScene
+        src="the-moment/engravings/canton_factories.jpg"
+        kenBurns={{ scaleFrom: 1.06, scaleTo: 1.26, xFrom: -2, xTo: 2, yFrom: 0, yTo: -2 }}
+        duotone={0.8}
+        sourceLabel="W. Daniell, Canton factories · public domain"
+      >
+        <UIDate date="MAR 1839" event="Lin reaches Canton" x={110} y={90} delay={6} />
+      </EngravingScene>
+    ),
+  },
+  {
+    from: 109.5,
+    to: 117.5,
+    name: "C5-7b the Iron-Headed Old Rat",
+    node: (
+      <SetShell set="SET-CANTON-FACTORY">
         <CharPunch
           puppet="CHAR-MERCHANT"
-          label="Jardine — sailed for London in January"
-          x={1290}
+          pose="stand"
+          label="Jardine — the Iron-Headed Old Rat"
+          x={960}
           y={910}
-          height={430}
-          delay={26}
+          height={470}
+          delay={8}
+          idle={false}
+        />
+        <UISchematic />
+      </SetShell>
+    ),
+  },
+  {
+    from: 117.5,
+    to: 123.3,
+    name: "C5-7c the rat had fled",
+    node: (
+      <SetShell set="SET-CANTON-FACTORY">
+        <CharPunch
+          puppet="CHAR-MERCHANT"
+          pose="stand"
+          x={1350}
+          y={910}
+          height={440}
+          delay={0}
           idle={false}
           flip
+        />
+        <UIStamp
+          kind="custom"
+          text="SAILED FOR LONDON"
+          subtext="JANUARY 1839"
+          x={760}
+          y={520}
+          rotation={-8}
+          delay={16}
+          backing
         />
         <UISchematic />
       </SetShell>
@@ -284,24 +508,56 @@ const CH5_BEATS: TimedBeat[] = [
   },
   {
     from: 123.3,
-    to: 145.49,
-    name: "C5-8 Humen — 20,000+ chests",
+    to: 134.5,
+    name: "C5-8a Humen — chests converge",
     // map-share batch 1: the seizure drawn as chests converging on Humen;
     // the 20,000+ ledger number survives as the corner plate
     node: <MapHumen title="Humen — destroyed in public" date="JUN 1839" />,
   },
   {
+    // CP3-N1 Layer C metaphor #3: the destruction itself (示意非假史料)
+    from: 134.5,
+    to: 145.49,
+    name: "C5-8b the stockpile destroyed",
+    node: <ChestsDestroyed />,
+  },
+  // C5-9 (was one 27.8s map hold) -> route / the letter itself / the fate
+  {
     from: 145.49,
-    to: 173.26,
-    name: "C5-9 the letter never delivered",
-    // map-share batch 1: the letter's failed route drawn Canton→Cape→London
-    // with the NEVER DELIVERED strike (replaces the abstract wire diagram)
+    to: 152.5,
+    name: "C5-9a a letter to Queen Victoria",
     node: <MapLetterRoute title="The letter to Queen Victoria" date="1839" />,
   },
   {
+    from: 152.5,
+    to: 162.5,
+    name: "C5-9b what the letter said",
+    node: (
+      <UIQuote
+        quote="Your country forbids opium at home — you know what this drug does. Why sell it to ours?"
+        attribution="Lin Zexu — letter to Queen Victoria"
+        context="1839 · the letter, in essence"
+        kind="paraphrase"
+        tagText="IN ESSENCE"
+        accent={TM.qingBlue}
+      />
+    ),
+  },
+  {
+    from: 162.5,
+    to: 173.26,
+    name: "C5-9c never delivered — a curiosity",
+    node: (
+      <MapLetterRoute
+        title="Printed in the London papers — as a curiosity"
+        date="NEVER DELIVERED"
+      />
+    ),
+  },
+  {
     from: 173.26,
-    to: CP1_SECTION_SECONDS.ch5,
-    name: "C5-10 two brakes, one clock",
+    to: 184.5,
+    name: "C5-10a two brakes, one clock",
     node: (
       <UICompare
         title="TWO BRAKES · ONE CLOCK"
@@ -315,6 +571,18 @@ const CH5_BEATS: TimedBeat[] = [
       />
     ),
   },
+  {
+    from: 184.5,
+    to: CP1_SECTION_SECONDS.ch5,
+    name: "C5-10b one signature away",
+    node: (
+      <UIChapter
+        kicker="ONE BRITISH SIGNATURE"
+        title="law enforcement → a national debt"
+        weak
+      />
+    ),
+  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -324,23 +592,59 @@ const CH5_BEATS: TimedBeat[] = [
 
 const CH7_BEATS: TimedBeat[] = [
   {
+    // CP3-N1 (producer §2.2 C7-1): chapter opens INSIDE the chamber —
+    // Hayter plate as hero, chapter title set over it (age-down texture)
     from: 0,
     to: 9.6,
-    name: "C7-1 chapter card",
+    name: "C7-1 chapter card — in the chamber",
     node: (
-      <UIChapter
-        kicker="CHAPTER SEVEN"
-        title="Nine Votes"
-        subtitle="April 1840 · the House of Commons · three nights"
-      />
+      <EngravingScene
+        src="the-moment/engravings/commons_house_1833.jpg"
+        kenBurns={{ scaleFrom: 1.04, scaleTo: 1.18, yFrom: 0, yTo: -2 }}
+        duotone={0.9}
+        sourceLabel="Hayter, The House of Commons 1833 · public domain"
+      >
+        <ChapterOverlay
+          kicker="CHAPTER SEVEN"
+          title="Nine Votes"
+          subtitle="April 1840 · the House of Commons · three nights"
+        />
+      </EngravingScene>
+    ),
+  },
+  // C7-2 (was one 25.4s hold on the compare card) -> semantic compare
+  // stays (禁转 map), the stakes get their own state
+  {
+    from: 9.6,
+    to: 21.5,
+    name: "C7-2a censure ≠ war vote",
+    node: (
+      <UICensure note="If it passed, the government could fall — and take the expedition down with it." />
     ),
   },
   {
-    from: 9.6,
+    from: 21.5,
     to: 35.01,
-    name: "C7-2 censure ≠ war vote",
+    name: "C7-2b if it passed — the stakes",
     node: (
-      <UICensure note="If it passed, the government could fall — and take the expedition down with it." />
+      <EngravingScene
+        src="the-moment/engravings/commons_house_1833.jpg"
+        kenBurns={{ scaleFrom: 1.3, scaleTo: 1.48, xFrom: -3, xTo: 4, yFrom: -4, yTo: -6 }}
+        duotone={0.8}
+        spotlight={{ xFrom: 1200, xTo: 700, y: 560, r: 560 }}
+        sourceLabel="Hayter, The House of Commons 1833 · public domain"
+      >
+        <UIStamp
+          kind="custom"
+          text="IF IT PASSED"
+          subtext="THE GOVERNMENT COULD FALL"
+          x={960}
+          y={720}
+          rotation={-7}
+          delay={22}
+          backing
+        />
+      </EngravingScene>
     ),
   },
   {
@@ -349,17 +653,47 @@ const CH7_BEATS: TimedBeat[] = [
     name: "C7-3 division — 271 / 262",
     node: <TallyBoard noes={271} ayes={262} date="APRIL 1840" />,
   },
+  // C7-4 (was one 22s two-puppet hold) -> shield metaphor / cornered
+  // cabinet / Elliot's paper tips them in
   {
+    // CP3-N1 Layer C metaphor #6: nine votes as the shield that held
     from: 46.61,
-    to: 68.6,
-    name: "C7-4 cornered, not bloodthirsty",
+    to: 52.5,
+    name: "C7-4a survived by nine votes",
+    node: <ShieldNineVotes />,
+  },
+  {
+    from: 52.5,
+    to: 61.0,
+    name: "C7-4b cornered, not bloodthirsty",
     node: (
       <SetShell set="SET-COMMONS">
         <UIDate date="1840" event="the Melbourne cabinet — cornered" x={110} y={90} delay={6} />
-        <CharPunch puppet="CHAR-MP" x={760} y={900} height={400} delay={14} idle={false} />
-        <CharPunch puppet="CHAR-MP" x={1160} y={900} height={400} delay={22} idle={false} flip />
+        <CharPunch puppet="CHAR-MP" pose="stand" x={720} y={900} height={420} delay={14} idle={false} />
+        <CharPunch puppet="CHAR-MP" pose="stand" x={1200} y={900} height={420} delay={22} idle={false} flip />
         <UISchematic />
       </SetShell>
+    ),
+  },
+  {
+    from: 61.0,
+    to: 68.6,
+    name: "C7-4c Elliot's paper tipped them in",
+    node: (
+      <PaperBackground>
+        <UIDate date="MONTHS OF HESITATION" event="ministers openly doubting" x={110} y={90} delay={4} />
+        <UIStamp
+          kind="custom"
+          text="ELLIOT'S PAPER"
+          subtext="THE ARITHMETIC TIPPED THEM IN"
+          x={960}
+          y={560}
+          rotation={-5}
+          delay={20}
+          backing
+        />
+        <UISchematic />
+      </PaperBackground>
     ),
   },
   {
@@ -370,15 +704,17 @@ const CH7_BEATS: TimedBeat[] = [
       <PaperBackground>
         <CharPunch
           puppet="CHAR-MP"
+          pose="action"
           label="Sir James Graham — moved the censure"
           x={700}
           y={900}
-          height={440}
+          height={460}
           delay={6}
           idle={false}
         />
         <CharPunch
           puppet="CHAR-MP"
+          pose="stand"
           label="Hogg — Company-aligned"
           x={1260}
           y={900}
@@ -420,10 +756,43 @@ const CH7_BEATS: TimedBeat[] = [
       />
     ),
   },
+  // C7-8 (was one 20.5s big-number hold) -> what the motion dared not say /
+  // the +20 arithmetic
   {
     from: 116.0,
+    to: 126.5,
+    name: "C7-8a nothing against the trade, nothing against the war",
+    node: (
+      <PaperBackground>
+        <UIDate date="THE ENGINEERED MOTION" event="moral clauses cost merchant votes" x={110} y={90} delay={4} />
+        <UIStamp
+          kind="custom"
+          text="THE OPIUM TRADE"
+          subtext="NOT MENTIONED"
+          x={620}
+          y={480}
+          rotation={-8}
+          delay={14}
+          backing
+        />
+        <UIStamp
+          kind="custom"
+          text="THE WAR ITSELF"
+          subtext="NOT MENTIONED"
+          x={1300}
+          y={660}
+          rotation={6}
+          delay={64}
+          backing
+        />
+        <UISchematic />
+      </PaperBackground>
+    ),
+  },
+  {
+    from: 126.5,
     to: 136.5,
-    name: "C7-8 the motion that dared not",
+    name: "C7-8b the motion that dared not",
     node: (
       <UIBigNum
         kicker="THE ENGINEERED MOTION"
@@ -442,10 +811,11 @@ const CH7_BEATS: TimedBeat[] = [
         <UIDate date="SECOND NIGHT" event="a sister addicted to laudanum at home" x={110} y={90} delay={6} />
         <CharPunch
           puppet="CHAR-MP"
+          pose="action"
           label="William Gladstone, 30"
           x={960}
           y={900}
-          height={480}
+          height={500}
           delay={10}
           idle={false}
         />
@@ -453,10 +823,12 @@ const CH7_BEATS: TimedBeat[] = [
       </PaperBackground>
     ),
   },
+  // C7-10 (was one 20.8s quote hold) -> the verbatim quote / both things
+  // are true (sincere AND cleared by the party)
   {
     from: 152.0,
-    to: 172.8,
-    name: "C7-10 a war more unjust",
+    to: 164.0,
+    name: "C7-10a a war more unjust",
     node: (
       // verbatim per producer_cp1_checkpoint_ep1_20260718.md ruling #2
       // (Hansard vol. 53, cc. 818–20 — narration may compress, transcript may not)
@@ -467,6 +839,37 @@ const CH7_BEATS: TimedBeat[] = [
         kind="transcript"
         accent={TM.britishRed}
       />
+    ),
+  },
+  {
+    from: 164.0,
+    to: 172.8,
+    name: "C7-10b both things are true",
+    node: (
+      <PaperBackground>
+        <CharPunch
+          puppet="CHAR-MP"
+          pose="stand"
+          label="William Gladstone, 30"
+          x={520}
+          y={900}
+          height={520}
+          delay={0}
+          idle={false}
+        />
+        <UIStamp kind="custom" text="EVERY WORD SINCERE" x={1280} y={380} rotation={-7} delay={12} backing />
+        <UIStamp
+          kind="custom"
+          text="CLEARED BY THE PARTY"
+          subtext="AMMUNITION IN THE OPERATION"
+          x={1280}
+          y={640}
+          rotation={5}
+          delay={52}
+          backing
+        />
+        <UISchematic />
+      </PaperBackground>
     ),
   },
   {
@@ -493,10 +896,11 @@ const CH7_BEATS: TimedBeat[] = [
       />
     ),
   },
+  // C7-12 (was one 26.8s quote hold) -> the anatomy / the same men
   {
     from: 200.0,
-    to: 226.78,
-    name: "C7-12 the Spectator's anatomy",
+    to: 216.0,
+    name: "C7-12a the Spectator's anatomy",
     node: (
       <UIQuote
         quote="Aristocrats eyeing commissions. Contractors. Shipowners. Lenders. And above all the opium merchants — assured their compensation could only be obtained by war."
@@ -505,6 +909,38 @@ const CH7_BEATS: TimedBeat[] = [
         kind="paraphrase"
         accent={TM.opiumPurple}
       />
+    ),
+  },
+  {
+    from: 216.0,
+    to: 226.78,
+    name: "C7-12b the same men",
+    node: (
+      <PaperBackground>
+        <CharPunch
+          puppet="CHAR-MERCHANT"
+          pose="stand"
+          label="signing loyalty letters"
+          x={700}
+          y={900}
+          height={450}
+          delay={6}
+          idle={false}
+        />
+        <CharPunch
+          puppet="CHAR-TRADER"
+          pose="action"
+          label="holding Elliot's paper"
+          x={1260}
+          y={900}
+          height={450}
+          delay={20}
+          idle={false}
+          flip
+        />
+        <UIStamp kind="custom" text="THE SAME MEN" x={960} y={330} rotation={-6} delay={44} />
+        <UISchematic />
+      </PaperBackground>
     ),
   },
   {

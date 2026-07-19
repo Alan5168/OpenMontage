@@ -116,7 +116,10 @@ const CH1_BEATS: TimedBeat[] = [
 /* ---------------- CH2 · Three Hammers — 121.20s ---------------- */
 /* chunks: 0.00 / 56.46 / 101.10 / 107.28 */
 
-const ClauseCard: React.FC<{ ghost?: boolean }> = ({ ghost = false }) => (
+const ClauseCard: React.FC<{ ghost?: boolean; stamped?: boolean }> = ({
+  ghost = false,
+  stamped = true,
+}) => (
   <PaperBackground tone="hi">
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", opacity: ghost ? 0.55 : 1 }}>
       <div
@@ -148,7 +151,9 @@ const ClauseCard: React.FC<{ ghost?: boolean }> = ({ ghost = false }) => (
         </div>
       ) : null}
     </AbsoluteFill>
-    <UIStamp kind="rejected" x={1230} y={700} rotation={-8} delay={ghost ? 0 : 55} />
+    {stamped ? (
+      <UIStamp kind="rejected" x={1230} y={700} rotation={-8} delay={ghost ? 0 : 10} />
+    ) : null}
   </PaperBackground>
 );
 
@@ -181,19 +186,29 @@ const CH2_BEATS: TimedBeat[] = [
   { from: 45.0, to: 56.46, name: "C2-5 zero defenders", node: (
       <UIBigNum kicker="THE MOST POWERFUL COMMERCIAL PRIVILEGE ON EARTH" value="0" qualifier="defenders — no Whig, no Tory" accent={TM.britishRed} />
     ) },
-  { from: 56.46, to: 81.0, name: "C2-6 empire, not trade", node: (
+  // C2-6 (was one 24.5s compare hold) -> CP3-N1: the reveal / the payout
+  { from: 56.46, to: 69.5, name: "C2-6a empire, not trade", node: (
       <UICompare
         title="WHAT THE COMPANY ACTUALLY FOUGHT FOR"
         leftTitle="The trade"
         rightTitle="The empire"
         leftItems={["let go"]}
-        rightItems={["India, army, territory, tax revenue", "10.5%/yr guaranteed — out of Indian taxes"]}
+        rightItems={["India, army, territory, tax revenue"]}
         leftAccent={TM.inkFaint}
         rightAccent={TM.britishRed}
-        footnote="a trading company died; a corporate state survived"
       />
     ) },
-  { from: 81.0, to: 101.1, name: "C2-7 the clause, rejected", node: <ClauseCard /> },
+  { from: 69.5, to: 81.0, name: "C2-6b the shareholders' cut", node: (
+      <UIBigNum
+        kicker="THE SHAREHOLDERS · GUARANTEED"
+        value="10.5%"
+        qualifier="a year, out of Indian taxes. A trading company died; a corporate state survived."
+        accent={TM.britishRed}
+      />
+    ) },
+  // C2-7 (was one 20.1s hold) -> the clause typeset / the rejection lands
+  { from: 81.0, to: 94.0, name: "C2-7a the fallback clause", node: <ClauseCard stamped={false} /> },
+  { from: 94.0, to: 101.1, name: "C2-7b rejected — unnecessary", node: <ClauseCard /> },
   { from: 101.1, to: 107.28, name: "C2-8 hold the ghost", node: <ClauseCard ghost /> },
   { from: 107.28, to: CP2_SECTION_SECONDS.ch2, name: "C2-9 execution date", node: (
       // DELIBERATE D_DEMO_PROPS reuse: values ("Act of 1833", 22 APRIL 1834)
@@ -219,7 +234,14 @@ const CH3_BEATS: TimedBeat[] = [
   { from: 36.84, to: 40.2, name: "C3-4 a brake", node: (
       <UIBigNum kicker="A DRUG CARTEL — WITH A COMPLIANCE DEPARTMENT" value="A BRAKE." qualifier="cynical. But a brake." accent={TM.qingBlue} />
     ) },
-  { from: 40.2, to: 62.65, name: "C3-5 the December 1833 letter", node: (
+  // C3-5 (was one 22.4s quote hold) -> the letter arrives / the warning read
+  { from: 40.2, to: 48.5, name: "C3-5a a private letter, December 1833", node: (
+      <PaperBackground>
+        <UIDate date="DEC 1833" event="a private letter from London" x={560} y={420} scale={1.4} delay={4} />
+        <UISchematic />
+      </PaperBackground>
+    ) },
+  { from: 48.5, to: 62.65, name: "C3-5b the warning", node: (
       <UIQuote
         quote="A sudden and entire stop … would produce mischief which might have been avoided by a more gradual change."
         attribution="Company correspondent, London — private letter"
@@ -245,7 +267,9 @@ const CH3_BEATS: TimedBeat[] = [
     ) },
   // C3-9..12 retimed to sentence-level VO offsets (producer diagnosis §2:
   // WARSHIPS card measured 14.0s static; five cuts ~4.3s each)
-  { from: 90.5, to: 110.9, name: "C3-9 letter refused, trade suspended", node: <MapCantonApproach step={1} /> },
+  // C3-9 (was one 20.4s map hold) -> CP3-N1: two map steps, hard cut
+  { from: 90.5, to: 100.5, name: "C3-9a the letter refused", node: <MapCantonApproach step={0} /> },
+  { from: 100.5, to: 110.9, name: "C3-9b trade suspended", node: <MapCantonApproach step={1} /> },
   { from: 110.9, to: 123.3, name: "C3-10 Napier — one continuous scene", node: (
       // continuous staging replaces five hard cuts (CEO #7 "太抽象");
       // fractions pin advance/batteries/fever/retreat/death to VO phrases
@@ -347,7 +371,16 @@ const CH6_BEATS: TimedBeat[] = [
   { from: 53.0, to: 56.88, name: "C6-6 at gunpoint", node: (
       <UIBigNum value="AT GUNPOINT." qualifier="in the end" accent={TM.britishRed} />
     ) },
-  { from: 56.88, to: 86.0, name: "C6-7 four steps — the episode claim", node: (
+  // C6-7 (was one 29.1s wire hold) -> the question / the four steps
+  { from: 56.88, to: 66.5, name: "C6-7a the episode's question", node: (
+      <UIBigNum
+        kicker="ASK IT WITH FULL WEIGHT"
+        value="0 → WAR"
+        qualifier="how does a law with zero defenders detonate a war six years later?"
+        accent={TM.opiumPurple}
+      />
+    ) },
+  { from: 66.5, to: 86.0, name: "C6-7b four steps — the episode claim", node: (
       <UIWire
         title="How a law with zero defenders detonates a war"
         beads={[
@@ -356,15 +389,43 @@ const CH6_BEATS: TimedBeat[] = [
           { year: "FLOOD", label: "cheap opium into China" },
           { year: "DEBT", label: "only a war could cash it" },
         ]}
-        beatFrames={130}
+        beatFrames={110}
         accent={TM.opiumPurple}
       />
     ) },
   { from: 86.0, to: 103.68, name: "C6-8 the switch in Westminster", node: (
       <UIBigNum kicker="NOT THE ONLY CAUSE — THE MOST UNDERRATED ONE" value="THE SWITCH" qualifier="sits in Westminster — passed while not one voice defended what was being torn down" accent={TM.qingBlue} />
     ) },
-  { from: 103.68, to: 129.5, name: "C6-9 the machine eats itself", node: (
+  // C6-9 (was one 25.8s map hold) -> the approach / the shot / the inversion
+  { from: 103.68, to: 112.5, name: "C6-9a the machine eats itself", node: (
       <MapPearl title="The machine eats itself" date="NOV 1839" />
+    ) },
+  { from: 112.5, to: 121.5, name: "C6-9b the Royal Navy opened fire", node: (
+      <PaperBackground>
+        <UIDate date="NOV 1839" event="mouth of the Pearl River" x={110} y={90} delay={2} />
+        <UIStamp
+          kind="custom"
+          text="ROYAL NAVY OPENED FIRE"
+          subtext="ON A BRITISH MERCHANT SHIP"
+          x={960}
+          y={560}
+          rotation={-6}
+          delay={12}
+          backing
+        />
+        <UISchematic />
+      </PaperBackground>
+    ) },
+  { from: 121.5, to: 129.5, name: "C6-9c the inversion", node: (
+      <UICompare
+        title="NOVEMBER 1839 · THE INVERSION"
+        leftTitle="British warships"
+        rightTitle="Chinese war junks"
+        leftItems={["firing to stop her obeying Chinese law"]}
+        rightItems={["sailing out to protect her"]}
+        leftAccent={TM.britishRed}
+        rightAccent={TM.qingBlue}
+      />
     ) },
   { from: 129.5, to: CP2_SECTION_SECONDS.ch6, name: "C6-10 a fleet is not a policy", node: (
       <UIChapter title="A fleet is not a policy." weak />
@@ -406,9 +467,18 @@ const CH8_BEATS: TimedBeat[] = [
         footnote="alignment, port for port — comparison only, no causal arrows"
       />
     ) },
-  { from: 39.6, to: 92.6, name: "C8-5 the man and the firm", node: (
-      // DELIBERATE D_DEMO_PROPS reuse: Jardine biography values verified
-      // against claim_log #60/#65 (producer diagnosis §1.3 confirms)
+  // C8-5 (was one 53.0s split-screen hold — the worst residue in the cut)
+  // -> CP3-N1: person lane / firm lane / both, cut at the 63.68 chunk start
+  // (DELIBERATE D_DEMO_PROPS reuse: Jardine biography values verified
+  // against claim_log #60/#65 — producer diagnosis §1.3 confirms)
+  { from: 39.6, to: 63.68, name: "C8-5a the man — never saw a day of it", node: (
+      // bio events land every ~3.7s so the 24s state moves throughout
+      <PersonVsFirm {...D_DEMO_PROPS.personVsFirm} show="person" eventStaggerFrames={110} />
+    ) },
+  { from: 63.68, to: 80.0, name: "C8-5b the firm is another story", node: (
+      <PersonVsFirm {...D_DEMO_PROPS.personVsFirm} show="firm" eventStaggerFrames={90} />
+    ) },
+  { from: 80.0, to: 92.6, name: "C8-5c still trades under the brand", node: (
       <PersonVsFirm {...D_DEMO_PROPS.personVsFirm} />
     ) },
   { from: 92.6, to: 114.5, name: "C8-6 the internet's list — mostly fake", node: (
@@ -429,8 +499,24 @@ const CH8_BEATS: TimedBeat[] = [
   { from: 182.13, to: 196.0, name: "C8-10 ZERO", node: (
       <UIBigNum value="ZERO" qualifier="direct commercial gain — China trade (banned from it since '34)" accent={TM.britishRed} />
     ) },
-  { from: 196.0, to: 216.0, name: "C8-11 the exposure", node: (
-      <UIBigNum kicker="OPIUM SHARE OF BRITISH INDIA'S REVENUE" value="7% → 20%+" qualifier="over two decades — openly, on the parliamentary record" accent={TM.opiumPurple} />
+  // C8-11 (was one 20.0s number hold) -> the exposure / the record
+  { from: 196.0, to: 206.5, name: "C8-11a the exposure", node: (
+      <UIBigNum kicker="OPIUM SHARE OF BRITISH INDIA'S REVENUE" value="7% → 20%+" qualifier="over two decades" accent={TM.opiumPurple} />
+    ) },
+  { from: 206.5, to: 216.0, name: "C8-11b on the record", node: (
+      <PaperBackground>
+        <UIStamp
+          kind="custom"
+          text="OPENLY"
+          subtext="ON THE PARLIAMENTARY RECORD"
+          x={960}
+          y={540}
+          rotation={-6}
+          delay={8}
+          backing
+        />
+        <UISchematic />
+      </PaperBackground>
     ) },
   { from: 216.0, to: 237.34, name: "C8-12 the India line", node: (
       <UIWire

@@ -31,6 +31,7 @@ import {
   ep1FullScratchDuration,
 } from "./compose/Cp2RoughCut";
 import { VoQcZh, voQcZhDuration } from "./compose/VoQcZh";
+import { Proto1813Density, proto1813Duration } from "./demo/Proto1813Density";
 
 const FPS = 30;
 
@@ -217,6 +218,15 @@ export const KitRoot: React.FC = () => {
         id="ep1-vo-zh-qc"
         component={VoQcZh}
         durationInFrames={voQcZhDuration(FPS)}
+        fps={FPS}
+        width={1920}
+        height={1080}
+      />
+      {/* CP3 pre-research: CO-3 density/engraving proto (not in any cut) */}
+      <Composition
+        id="proto-1813-density"
+        component={Proto1813Density}
+        durationInFrames={proto1813Duration(FPS)}
         fps={FPS}
         width={1920}
         height={1080}

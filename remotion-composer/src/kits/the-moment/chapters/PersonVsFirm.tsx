@@ -26,6 +26,11 @@ export interface PersonVsFirmProps {
   divider?: string; // e.g. "The firm is another story."
   personAccent?: string;
   firmAccent?: string;
+  /** CP3 density split: which lane carries this hard-cut state; the other
+   * lane stays as a faint anchor so the geometry never jumps */
+  show?: "person" | "firm" | "both";
+  /** frames between successive event reveals (VO-paced cascade) */
+  eventStaggerFrames?: number;
 }
 
 /**
@@ -44,6 +49,8 @@ export const PersonVsFirm: React.FC<PersonVsFirmProps> = ({
   divider,
   personAccent = TM.inkSoft,
   firmAccent = TM.britishRed,
+  show = "both",
+  eventStaggerFrames = 14,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -101,7 +108,7 @@ export const PersonVsFirm: React.FC<PersonVsFirmProps> = ({
         </svg>
         {events.map((ev, i) => {
           const evP = spring({
-            frame: Math.max(0, frame - delayBase - 8 - i * 14),
+            frame: Math.max(0, frame - delayBase - 8 - i * eventStaggerFrames),
             fps,
             config: TM.spring,
           });
@@ -163,12 +170,20 @@ export const PersonVsFirm: React.FC<PersonVsFirmProps> = ({
       ) : null}
 
       {/* person lane: puppet anchor, name-card grammar (no likeness) */}
-      <CharPunch puppet="CHAR-MERCHANT" x={210} y={880} height={330} delay={4} idle={false} />
-      {lane(480, personTitle, personName, personEvents, personAccent, true, 16)}
+      <div style={{ opacity: show === "firm" ? 0.22 : 1 }}>
+        <CharPunch puppet="CHAR-MERCHANT" x={210} y={880} height={330} delay={4} idle={false} />
+        {show === "firm"
+          ? lane(480, personTitle, personName, [], personAccent, true, 0)
+          : lane(480, personTitle, personName, personEvents, personAccent, true, 16)}
+      </div>
 
       {/* firm lane: company emblem anchor */}
-      <CharPunch puppet="CHAR-COMPANY" x={1710} y={860} height={300} delay={10} idle={false} />
-      {lane(1210, firmTitle, firmName, firmEvents, firmAccent, false, 28)}
+      <div style={{ opacity: show === "person" ? 0.22 : 1 }}>
+        <CharPunch puppet="CHAR-COMPANY" x={1710} y={860} height={300} delay={10} idle={false} />
+        {show === "person"
+          ? lane(1210, firmTitle, firmName, [], firmAccent, false, 0)
+          : lane(1210, firmTitle, firmName, firmEvents, firmAccent, false, 28)}
+      </div>
 
       <UISchematic />
     </PaperBackground>

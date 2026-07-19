@@ -25,6 +25,9 @@ export interface MemorialsDuelProps {
   /** frames before the right plate enters (waveform-timed beats pass the
    * measured VO pause; default keeps the old near-simultaneous demo look) */
   rightDelayFrames?: number;
+  /** CP3 density split: render one memorial centered as its own hard-cut
+   * state instead of the duel layout */
+  solo?: "left" | "right";
 }
 
 /**
@@ -37,6 +40,7 @@ export const MemorialsDuel: React.FC<MemorialsDuelProps> = ({
   right,
   title,
   rightDelayFrames = 18,
+  solo,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -111,6 +115,19 @@ export const MemorialsDuel: React.FC<MemorialsDuelProps> = ({
       </div>
     );
   };
+
+  if (solo) {
+    const m = solo === "left" ? left : right;
+    return (
+      <PaperBackground>
+        <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", paddingTop: 20 }}>
+          {/* solo plates always enter on the "left" clock — the hard cut is the state change */}
+          {plate(m, "left")}
+        </AbsoluteFill>
+        <UISchematic />
+      </PaperBackground>
+    );
+  }
 
   return (
     <PaperBackground>
