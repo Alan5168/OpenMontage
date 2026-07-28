@@ -14,10 +14,11 @@
 
 **口播 callback（必写）**
 
-- XHS 开场固定：「整理了好久的数据，希望对大家有用～」→ 结尾收藏 CTA + 笔记气质
-- DY 片尾：「关注 Astra 聊 AI，每天一条产业干货」
+- XHS 开场：**观众生活/行情焦虑先行** → 研报定心丸/打脸 → 机制数字（**禁**「投研翻到研报很有用」作第一句；**禁**硬绑「整理了好久的数据」）→ 结尾开放思考 / A·B + 笔记气质
+- DY 开场：第一句**更绝对/争议/通俗**的生活或争论钩子，再进研报证据；片尾「关注 Astra 聊 AI，每天一条产业干货」
 - YT 片尾英文对齐简介第一句 value prop
 - 画面禁止投行 Logo；来源放旁白/片尾
+- 开场画面：前 3 秒静图/信息图 + 醒目字幕（详见 skill「开场设计」）；开场自检：普通人是否觉得「跟我有关」
 
 ## 锁死音频
 
@@ -42,15 +43,15 @@ Disk: renders/final_{xhs,dy}.mp4 + exports/.../final.mp4 hardlink only — never
 5. 参考音频先 ASR：提关键数字、类比、转折与每 30 秒新主张/证据/机制；脚本若更稀，先补信息再过闸
 6. 复杂 PPT 字体/溢出先修源 PPTX并导出 PDF；用户要求时放 `reader_bonus/`，不得附原研报
 
-## 人审闸门（批准不跨级）
+## 人审策略（2026-07-26：成片前免中途审批）
 
-proposal → 双平台 script → 双平台 scene_plan → **试听与静帧** → 成片/发布包。
+与 skill `design-report-explainer` 对齐：**按需跑从给料到发布包就绪，中间不向 CEO 要审批**。
 
-- “批双平台脚本”只授权进入分镜
-- “批双平台分镜”只授权生成试听与静帧
-- 试听与静帧：两平台代表性 TTS + 双封面 + 所选 runtime 开场 + 最复杂竖屏图表
-- A/B 选择与 runtime 属于当期决定，不写成全局默认
-- 未批试听与静帧，不做全量付费资产
+- proposal / script / scene_plan / 试听静帧 / 成片：agent 按本 defaults + skill **自决并落盘** `decision_log`
+- 付费前口头报工具/费用，不阻塞等批
+- **唯一 CEO 闸**：真正上传小红书/抖音
+- 定时无人值守仍最多到 proposal（零付费）
+- 内部可自检 TTS/封面/开场/复杂图，不合格重做，不要停问
 
 ## 钩子与信息密度
 
@@ -94,13 +95,13 @@ proposal → 双平台 script → 双平台 scene_plan → **试听与静帧** �
 
 Run 内脚本模式（范例 `make_covers.py`）：
 
-1. XHS 1080×1440 笔记分层封
-2. DY 1080×1920 大字封
+1. 必出两套：`cover_xhs_note.png`（笔记风高信息量）+ `cover_douyin_bigtype.png`（高对比大字、数字/绝对主张更大）
+2. **主图可轮换**：允许交叉挂载试反应；decision_log / README_covers 记 `xhs_main` / `dy_main`
 3. `ffmpeg` 抽 `cover_from_video.png`
 
 输出：`exports/<slug>/{xhs,dy}/covers/`
 
-**成片开场：** 把设计封面垫成 1080×1920，片头 **≈2s** 静帧；混音时旁白 `adelay=2000`，该秒仅 BGM。`render_fallback.py` 已实现 cover_hold。尾帧再垫 ~0.45s，避免口播 disclaimer 被裁。
+**成片开场：** 前几秒静图结论/信息图（服务 3 秒留客）；feed 主封可与片头不同、可轮换。DY/XHS 口播第一句都必须钩**观众生活相关性**；禁止作者「翻到研报」暖场。`render_fallback.py` cover_hold 可垫信息图。尾帧再垫 ~0.45s。
 
 外部生图只做无字底图；Gemini prompt 契约见 skill `references/covers.md`。头像只在品牌初始化时生成一次，批准后锁定，不随每期重抽；prompt 见 `references/production-defaults.md`。
 
@@ -121,8 +122,9 @@ scene_plan / render：KPI、对照、时间轴 **上下堆叠**；字幕偏上�
 | Director | 增量 |
 |----------|------|
 | research | NotebookLM pillars + quiz_bank + ASR density；复杂 PPT 修复清单 |
-| script | 反常识矛盾钩子；账号 callback；XHS 开场固定句；密度复核；测验 CTA |
-| scene_plan | 双平台分镜闸门；最复杂图表列为静帧样片 |
-| asset | 先试听与静帧闸门；锁死 voice/speed/bgm_vol；**拷贝 Astra sheet 到 assets/brand** |
+| script | 反常识矛盾钩子；账号 callback；开场见 skill「开场设计」（DY 更绝对；禁空暖场）；密度复核；测验 CTA |
+| publish | 双封面可轮换 + cover_from_video；quiz 钉评；**正文三原则**；按需 `reader_bonus` |
+| scene_plan | 双平台分镜写完即进资产；最复杂图表列入自检静帧 |
+| asset | 直接批量；锁死 voice/speed/bgm_vol；**拷贝 Astra sheet 到 assets/brand** |
 | compose | **复用范例 render_fallback Astra chrome**；竖堆叠；全片进度条；cover_hold；**DY 成片 CBR≈1400kbps → 35–45MB**（防抖音低质标；须 minrate）；**exports/final.mp4 hardlink，禁双份** |
-| publish | 双封面 + cover_from_video；quiz 钉评；**正文三原则**；按需 `reader_bonus` |
+| publish | 双封面可轮换 + cover_from_video；quiz 钉评；**正文三原则**；按需 `reader_bonus` |
