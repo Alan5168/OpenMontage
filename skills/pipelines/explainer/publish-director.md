@@ -68,6 +68,17 @@ Describe a thumbnail that:
 
 *Note: Actual thumbnail generation happens via image_selector if available, otherwise it's a concept for manual creation.*
 
+### Alan dual-platform covers (this fork — mandatory)
+
+For Astra report explainers, do **not** ship a single generic thumbnail. Follow `alan-report-explainer-defaults.md` + skill `design-report-explainer/references/covers.md`:
+
+1. **XHS** — note-dense cover (`cover_xhs_note.png`, 1080×1440): brand「Astra 的 AI 趋势笔记」+ huge topic word + 3 color bands of facts（信息量优先）.
+2. **Douyin** — high-contrast big-type (`cover_douyin_bigtype.png`, 1080×1920): absolute hook + **larger numbers/claims** + KPI strip +「Astra 聊 AI」.
+3. **Rotation allowed**: both designs must exist; feed main image may cross-mount for A/B（记 decision_log）. When mounting on DY, prefer higher contrast / bigger absolute claims; on XHS, prefer note density.
+4. **Both packs** — `cover_from_video.png`；片头静帧优先服务开场留客（可与 feed 主封不同）.
+5. Pin comments: Quiz from `quiz_bank` or **agent-authored** 1–3 questions.
+6. Descriptions must follow skill `caption-body.md`: (1) say what the video is in 1–3 sentences, (2) natural 2–3 domain keywords in body, (3) closing question — XHS thoughtful / Douyin debate. Match locked account bios; never claim to send original sell-side PDFs.
+
 ### Step 4: Create Chapter Markers
 
 From the script sections, generate YouTube-style chapters:

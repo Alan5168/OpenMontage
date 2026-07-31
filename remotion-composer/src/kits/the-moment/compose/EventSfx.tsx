@@ -15,15 +15,18 @@ const SFX = {
 
 type Hit = { at: number; src: keyof typeof SFX; volume: number; name: string };
 
-/** section-relative hits */
+/**
+ * section-relative hits — volumes: instrument pass A 2026-07-19
+ * (CH6 fire scratch TPK −3.6 → calib −4.6; paper/stamp raw light).
+ */
 const HITS: Record<string, Hit[]> = {
-  CO: [{ at: 24.0, src: "cannon", volume: 0.32, name: "sfx-wrong-moment" }],
+  CO: [{ at: 24.0, src: "cannon", volume: 0.3, name: "sfx-wrong-moment" }],
   CH6: [
-    { at: 31.0, src: "paper", volume: 0.4, name: "sfx-one-signature" },
-    { at: 55.0, src: "stamp", volume: 0.38, name: "sfx-at-gunpoint" },
-    { at: 117.0, src: "cannon", volume: 0.42, name: "sfx-opened-fire" },
+    { at: 31.0, src: "paper", volume: 0.45, name: "sfx-one-signature" },
+    { at: 55.0, src: "stamp", volume: 0.4, name: "sfx-at-gunpoint" },
+    { at: 117.0, src: "cannon", volume: 0.36, name: "sfx-opened-fire" },
   ],
-  CH7: [{ at: 37.0, src: "stamp", volume: 0.3, name: "sfx-nine-votes-board" }],
+  CH7: [{ at: 37.0, src: "stamp", volume: 0.34, name: "sfx-nine-votes-board" }],
 };
 
 export const EventSfx: React.FC<{ label: string }> = ({ label }) => {

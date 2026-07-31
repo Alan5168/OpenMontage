@@ -155,6 +155,30 @@ Read the target platform from the brief artifact. Map to a media profile:
 
 Get the exact encoding parameters via `ffmpeg_output_args(get_profile(name))`.
 
+### Alan / 9:16 compose locks (this fork)
+
+When target is Xiaohongshu / Douyin vertical (`1080x1920`), also enforce `alan-report-explainer-defaults.md`:
+
+- Charts/KPIs **stack vertically** (no cramped left-right KPI rows).
+- Mix: narration 1.0, BGM **0.32**, BGM atempo **1.0**.
+- **Astra chrome (follow the canonical spec — do not invent visuals):**
+  - Canonical sheet: `~/agent-workspace/artifacts/hatch-pet/astra-20260716/final/spritesheet-extended.png` → copy into run `assets/brand/spritesheet-extended.png`.
+  - Implement in the selected runtime from skill `design-report-explainer/references/astra-chrome.md`; never copy an entire historical run script.
+  - Bottom: **one** full-video progress bar; tip = sheet row1 running-right; **exactly one** fox per frame.
+  - Top-right: play **full sheet row** then pick next via BGM energy; hold 36/24/14; no white card; no chroma-key; leave caption band clear on the right.
+  - Do **not** generate a new mascot, key out green, or use `astra-*.png` scraps as the animation source.
+- Cover hold ≈1s (design cover → 9:16) with BGM only before narration (`adelay`).
+- Never burn Goldman Sachs / production-note watermarks into frames.
+- Remotion unavailable → run-local `render_fallback.py` OK; do **not** expand OpenMontage global features (STOP #15).
+- Pitfalls: skill `design-report-explainer/references/lessons-from-production.md`.
+
+### Alan / batch disk lifecycle (binding)
+
+- All frame/clip/overlay scratch goes under `renders/work/{xhs,dy}/`; rerendering a platform replaces that directory instead of creating versioned siblings.
+- QA keeps at most 12 sampled frames per platform. Never retain full-frame sequences after the final ffprobe/transcription/visual review passes.
+- After the publish package is ready, remove scratch, old renders, `*_backup.mp4`, normalized/mixed temporary audio, clips and overlays. Keep only `renders/final_xhs.mp4`, `renders/final_dy.mp4`, required assets/artifacts and hardlinked exports.
+- Default post-GC target is **≤250MB/run**. Record `du -sh` and any justified exception in `PROJECT_STATE.md`.
+
 ### Step 4: Render Video
 
 Call the `video_compose` tool with:

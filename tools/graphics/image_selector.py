@@ -129,8 +129,13 @@ class ImageSelector(BaseTool):
             },
             "preferred_provider": {
                 "type": "string",
-                "description": "Provider name or 'auto'. Valid values are discovered at runtime from the registry.",
-                "default": "auto",
+                "description": (
+                    "Provider name or 'auto'. "
+                    "Default = 'volcengine' (Doubao Seedream-5.0-lite Token Plan primary, 2026-07-24). "
+                    "Explicit fallback chain when volcengine unavailable: volcengine → agnes → others. "
+                    "Valid values are discovered at runtime from the registry."
+                ),
+                "default": "volcengine",
             },
             "allowed_providers": {
                 "type": "array",
@@ -311,7 +316,13 @@ class ImageSelector(BaseTool):
         candidates: list[BaseTool],
         task_context: dict[str, Any],
     ) -> tuple[BaseTool | None, object]:
-        """Select the best provider using scored ranking."""
+        """Select the best provider using scored ranking with explicit fallback.
+
+        Selection order (2026-07-24 policy):
+          1. Caller's `preferred_provider` if available
+          2. Explicit fallback chain `volcengine → agnes` (only when preferred is auto/volcengine)
+          3. Highest-scored available provider
+        """
         from lib.scoring import rank_providers
 
         preferred = inputs.get("preferred_provider", "auto")
@@ -327,16 +338,37 @@ class ImageSelector(BaseTool):
             if tool.provider not in tool_by_provider and self._tool_selectable(tool, inputs):
                 tool_by_provider[tool.provider] = tool
 
+        # 1. Caller-specified preferred
         if preferred != "auto":
             for score_item in rankings:
                 if score_item.provider == preferred and score_item.provider in tool_by_provider:
                     return tool_by_provider[score_item.provider], score_item
 
+        # 2. Explicit fallback chain (only when caller left it on default)
+        if preferred in ("auto", "volcengine"):
+            for fb_provider in self._fallback_chain():
+                if fb_provider == preferred:
+                    continue
+                if fb_provider in tool_by_provider:
+                    for score_item in rankings:
+                        if score_item.provider == fb_provider:
+                            return tool_by_provider[fb_provider], score_item
+
+        # 3. Highest-scored available provider (any)
         for score_item in rankings:
             if score_item.provider in tool_by_provider:
                 return tool_by_provider[score_item.provider], score_item
 
         return None, None
+
+    def _fallback_chain(self) -> list[str]:
+        """Explicit image provider fallback chain (2026-07-24 hard rule).
+
+        volcengine (Doubao Seedream Token Plan primary) → agnes (Agnes AI free fallback).
+        Used by `_select_best_tool` when caller did not pin a specific provider
+        and the primary is unavailable (e.g. ARK quota exhausted).
+        """
+        return ["volcengine", "agnes"]
 
     def _prepare_task_context(self, inputs: dict[str, Any]) -> dict[str, Any]:
         from lib.scoring import normalize_task_context

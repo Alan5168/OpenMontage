@@ -2,7 +2,7 @@
 
 > 与 skill `design-report-explainer` 同步。本文件给 **OpenMontage-localization-v1** 内 research/script/asset/publish/compose director 与 run 内脚本对齐用。
 > 权威细节仍以 `agent-workspace/skills-staging/design-report-explainer/references/*` 为准。
-> 达标范例 run：`projects/gs-agentic-ai-moats-xhs-20260724/`
+> 历史生产 run 可删除，不承担模板职责；规范只住本文件、`design-report-explainer` references 与 director。
 
 ## 账号与简介（封面顶栏 / 发布简介 / 口播 callback）
 
@@ -27,7 +27,8 @@ XHS: voice_id=female-chengshu-jingpin  speed=1.2  narr_vol=1.0  bgm_vol=0.32  at
 DY:  voice_id=male-qn-jingying-jingpin speed=1.2  narr_vol=1.0  bgm_vol=0.32  atempo=1.0
 BGM: 低爆点/低峰谷；烫源先 loudnorm；两端可同曲
 DY deliverable: 35–45MB @ ~3.5min → CBR video ~1400k (+ AAC 192k); must set -minrate=-maxrate
-Disk: renders/final_{xhs,dy}.mp4 + exports/.../final.mp4 hardlink only — never also copy final_dy.mp4
+Disk: scratch=renders/work/{xhs,dy} (overwrite on rerender); renders/final_{xhs,dy}.mp4 + exports/.../final.mp4 hardlink only
+GC: package-ready remove scratch/frames/clips/overlays/temp audio/backups; target <=250MB/run; published run -> Trash
 ```
 
 写入 `artifacts/edit_decisions.json`、`scene_spec.bgm_volume`、`composition.json` music.volume、run 内 `gen_tts.py`。
@@ -61,8 +62,7 @@ Disk: renders/final_{xhs,dy}.mp4 + exports/.../final.mp4 hardlink only — never
 ## Astra 右上 + 底栏进度（compose 必读 · 复用勿自建）
 
 > 完整规格：skill `design-report-explainer/references/astra-chrome.md`  
-> **实现源码（复制）：** `projects/gs-agentic-ai-moats-xhs-20260724/render_fallback.py`  
-> （`astra_progress` / `astra_showcase` / `_load_bgm_energy` 整段）
+> **实现规范：** skill `design-report-explainer/references/astra-chrome.md`。在已选 runtime 内实现，禁止复制历史 run 的整套 `render_fallback.py`。
 
 ### 资产（不要另找视觉）
 
@@ -72,7 +72,7 @@ Disk: renders/final_{xhs,dy}.mp4 + exports/.../final.mp4 hardlink only — never
 | run 内拷贝 | `assets/brand/spritesheet-extended.png` |
 | 单元格 | 192×208，RGBA 切格；**禁止** chroma-key / 改色 / 用 decoded 碎帧 |
 
-开局：`cp` 权威 sheet → `assets/brand/`；渲染脚本从范例 run `cp` 或移植 Astra 函数。**禁止** agent 自建宠物、seedream 生吉祥物、另装 Remotion 宠物包。
+开局：`cp` 权威 sheet → `assets/brand/`；渲染按 `astra-chrome.md` 在已选 runtime 内实现。**禁止** agent 自建宠物、seedream 生吉祥物、复制历史 run 整套脚本或另装 Remotion 宠物包。
 
 ### 底栏进度条
 
@@ -122,9 +122,7 @@ scene_plan / render：KPI、对照、时间轴 **上下堆叠**；字幕偏上�
 | Director | 增量 |
 |----------|------|
 | research | NotebookLM pillars + quiz_bank + ASR density；复杂 PPT 修复清单 |
-| script | 反常识矛盾钩子；账号 callback；开场见 skill「开场设计」（DY 更绝对；禁空暖场）；密度复核；测验 CTA |
-| publish | 双封面可轮换 + cover_from_video；quiz 钉评；**正文三原则**；按需 `reader_bonus` |
 | scene_plan | 双平台分镜写完即进资产；最复杂图表列入自检静帧 |
 | asset | 直接批量；锁死 voice/speed/bgm_vol；**拷贝 Astra sheet 到 assets/brand** |
-| compose | **复用范例 render_fallback Astra chrome**；竖堆叠；全片进度条；cover_hold；**DY 成片 CBR≈1400kbps → 35–45MB**（防抖音低质标；须 minrate）；**exports/final.mp4 hardlink，禁双份** |
+| compose | 按规范实现 Astra chrome；竖堆叠；全片进度条；cover_hold；**DY 成片 CBR≈1400kbps → 35–45MB**（防抖音低质标；须 minrate）；重渲覆盖 `renders/work/<platform>`；**exports/final.mp4 hardlink，禁双份**；包就绪后 GC |
 | publish | 双封面可轮换 + cover_from_video；quiz 钉评；**正文三原则**；按需 `reader_bonus` |

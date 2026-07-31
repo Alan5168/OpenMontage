@@ -45,17 +45,6 @@ class TTSSelector(BaseTool):
                 "type": "string",
                 "description": "Provider-specific voice ID. Passed through to the selected TTS provider.",
             },
-            "voice_language": {
-                "type": "string",
-                "enum": ["zh", "en"],
-                "description": "Kling official voice language. Passed through when selected provider supports it.",
-            },
-            "voice_speed": {
-                "type": "number",
-                "minimum": 0.5,
-                "maximum": 2.0,
-                "description": "Kling official voice speed. Use speed for OpenAI/ElevenLabs-style controls.",
-            },
             "model_id": {
                 "type": "string",
                 "description": "TTS model to use (e.g. eleven_multilingual_v2). Passed through to provider.",
@@ -72,51 +61,17 @@ class TTSSelector(BaseTool):
                 "type": "number", "minimum": 0, "maximum": 1,
                 "description": "Style exaggeration (ElevenLabs). Higher = more expressive.",
             },
-            "instructions": {
-                "type": "string",
-                "description": "Provider-level delivery instructions for expressive narration when supported.",
-            },
-            "speaking_rate": {
-                "type": "number",
-                "minimum": 0.25,
-                "maximum": 2.0,
-                "description": "Google-style speakingRate control. Use speed for OpenAI/ElevenLabs-style controls.",
-            },
-            "speed": {
-                "type": "number",
-                "minimum": 0.25,
-                "maximum": 4.0,
-                "description": "Alias for speaking speed used by some providers.",
-            },
-            "pitch": {
-                "type": "number",
-                "minimum": -50,
-                "maximum": 50,
-                "description": "Provider-specific pitch control. Google TTS accepts -20..20; HeyGen-style providers may accept wider ranges.",
-            },
-            "input_type": {
-                "type": "string",
-                "enum": ["text", "ssml"],
-                "default": "text",
-                "description": "Use 'ssml' only when the selected provider supports tags such as <break>.",
-            },
-            "voice_performance": {
-                "type": "object",
-                "description": "Structured voice-performance plan or section delivery cues from the script artifact.",
-            },
-            "sample_mode": {
-                "type": "boolean",
-                "default": False,
-                "description": "True when generating an approval sample before batch narration.",
-            },
             "output_format": {
                 "type": "string",
                 "description": "Audio output format (e.g. mp3_44100_128). Passed through to provider.",
             },
             "preferred_provider": {
                 "type": "string",
-                "description": "Provider name or 'auto'. Valid values are discovered at runtime from the registry.",
-                "default": "auto",
+                "description": (
+                    "Provider name or 'auto'. Default is 'minimax' (Token Plan TTS) when available; "
+                    "falls back to scored ranking if unavailable. Valid values are discovered at runtime."
+                ),
+                "default": "minimax",
             },
             "allowed_providers": {
                 "type": "array",
@@ -211,7 +166,8 @@ class TTSSelector(BaseTool):
         """Select the best TTS provider using scored ranking."""
         from lib.scoring import rank_providers
 
-        preferred = inputs.get("preferred_provider", "auto")
+        # Alan policy 2026-07-15: default preferred_provider=minimax (Token Plan).
+        preferred = inputs.get("preferred_provider") or "minimax"
         allowed = set(inputs.get("allowed_providers") or [])
         if allowed:
             candidates = [tool for tool in candidates if tool.provider in allowed]
@@ -227,6 +183,7 @@ class TTSSelector(BaseTool):
             for score_item in rankings:
                 if score_item.provider == preferred and score_item.provider in tool_by_provider:
                     return tool_by_provider[score_item.provider], score_item
+            # Preferred unavailable (e.g. no MINIMAX_API_KEY) → fall through to ranking.
 
         for score_item in rankings:
             if score_item.provider in tool_by_provider:

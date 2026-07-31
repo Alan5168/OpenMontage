@@ -26,6 +26,9 @@ The EP solves all of these by maintaining cumulative state and applying judgment
 | Schemas | All artifact schemas | Validation |
 | Playbook | Active style playbook | Quality constraints |
 | Tools | Full tool registry | Available capabilities |
+| Alan fork | `skills/pipelines/explainer/alan-report-explainer-defaults.md` | Locked voices/BGM/covers/NotebookLM/Astra for report explainers |
+
+When producing Alan Astra 研报竖版（Xiaohongshu → Douyin）, EP must enforce that defaults file at research/script/asset/compose/publish gates. Authoritative skill: `design-report-explainer` (skills-staging / `~/.agent-skills`).
 
 ## Cumulative State
 

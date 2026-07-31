@@ -15,6 +15,16 @@ This stage is what separates an OpenMontage video from generic AI slop. Without 
 | Schema | `schemas/artifacts/research_brief.schema.json` | Artifact validation |
 | User input | Topic, audience hint, platform hint | Research scope |
 | Tools | Web search, web fetch | Research execution |
+| Alan fork | `skills/pipelines/explainer/alan-report-explainer-defaults.md` | NotebookLM pillars/quiz + account constraints |
+
+## Alan / NotebookLM intake (this fork)
+
+If the project has `assets/notebooklm/` or the user provided NotebookLM exports (one-page overview PPT, Quiz, FAQ):
+
+1. Treat **overview PPT + Quiz as P0** — extract into `research_brief.pillars[]` and `research_brief.quiz_bank[]` before deep PDF OCR finishes.
+2. Infographic with garbled CJK → structure/data only; **redraw** charts (never burn original into video).
+3. Strip Buy/Sell/price targets from any sheet — compliance.
+4. Full skill: `design-report-explainer/references/notebooklm-intake.md`.
 
 ## Process
 

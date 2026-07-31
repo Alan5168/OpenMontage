@@ -17,6 +17,16 @@ The script is the backbone of the video. Every visual, every scene, every audio 
 | Meta skill | `skills/meta/voice-performance-director.md` | Structured TTS delivery cues for natural, expressive narration |
 | Layer 3 | TTS provider skills (check `agent_skills` on the selected TTS tool) | TTS capabilities for speaker directions |
 | Tool | `tts_preprocess` (`tools/audio/tts_preprocess.py`) | Deterministic hop: script JSON → engine-ready text (numbers, abbrev, markdown strip). Asset stage runs this **before** `tts_selector`. |
+| Alan fork | `skills/pipelines/explainer/alan-report-explainer-defaults.md` | Locked account callbacks + opening line |
+
+## Alan Astra accounts (this fork)
+
+- Opening (both): conclusion-first static visual + VO that you found someone’s latest dated research while investing/researching → useful → share/collect/discuss. **Do not** hardcode「整理了好久的数据，希望对大家有用～」.
+- **Douyin加码**: first sentence more absolute/controversial/plain（照顾 3s drop-off + default mute）；bigger on-screen claims.
+- **XHS**: same skeleton, slightly more note/share tone; denser on-screen info OK.
+- Closing must verbally callback the platform account name + bio punchline (XHS / DY / YT).
+- Prefer a mid/end Quiz CTA when `research_brief.quiz_bank` exists; else agent-authored quiz in pinned comments.
+- Never put investment Buy/Sell language on screen or in narration.
 
 ## Process
 

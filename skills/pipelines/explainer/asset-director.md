@@ -33,6 +33,28 @@ Quick routing for common explainer needs:
 | Playbook | Active style playbook | Image prompts, diagram style, audio preferences |
 | Tools | `tts_selector`, `image_selector`, `video_selector`, `diagram_gen`, `code_snippet`, `music_gen` — selectors auto-discover all available providers from the registry | Generation capabilities |
 | Cost tracker | `tools/cost_tracker.py` | Budget governance |
+| Alan fork | `skills/pipelines/explainer/alan-report-explainer-defaults.md` | Locked MiniMax voice / speed / BGM mix |
+
+## Alan audio locks (this fork — do not freestyle)
+
+```
+XHS: MiniMax voice_id=female-chengshu-jingpin  speed=1.2  narr_vol=1.0  bgm_vol=0.32  bgm_atempo=1.0
+DY:  MiniMax voice_id=male-qn-jingying-jingpin speed=1.2  narr_vol=1.0  bgm_vol=0.32 bgm_atempo=1.0
+```
+
+Write these into `edit_decisions` / `scene_spec` / run `gen_tts.py`. Do **not** speed-match BGM with `atempo` to fit speech — trim or loop BGM instead. BGM ≤0.10 is a known failure mode (inaudible under narration).
+
+### Alan Astra asset bootstrap (this fork)
+
+Before compose, ensure the run can render chrome without hunting assets:
+
+```bash
+mkdir -p assets/brand
+cp -n ~/agent-workspace/artifacts/hatch-pet/astra-20260716/final/spritesheet-extended.png \
+  assets/brand/spritesheet-extended.png
+```
+
+Do **not** commission new pet art or copy a historical run's whole render script. Implement the chrome in the selected runtime from skill `astra-chrome.md` / `alan-report-explainer-defaults.md`.
 
 ## Process
 

@@ -28,12 +28,17 @@ export const bgmForLabel = (label: string): BgmKind => {
   return "solemn";
 };
 
-/** linear gain under VO */
+/**
+ * linear gain under VO — 2026-07-19 instrument pass A
+ * (mix_probe cue TP/mean; not GM ear sign-off).
+ * Prior scratch: solemn 0.12 / tense 0.14 / resolve 0.08.
+ * tense raw bed ~+3.8 LU vs solemn → was only ~−3.5 dB under VO mean.
+ */
 export const bgmVolumeForLabel = (label: string): number => {
   const L = label.toUpperCase();
-  if (L === "EP") return 0.08;
-  if (L === "CH3" || L === "CH6") return 0.14;
-  return 0.12;
+  if (L === "EP") return 0.09;
+  if (L === "CH3" || L === "CH6") return 0.09;
+  return 0.1;
 };
 
 export const BgmUnderVo: React.FC<{
@@ -42,7 +47,7 @@ export const BgmUnderVo: React.FC<{
   volume?: number;
 }> = ({ kind, label, volume }) => {
   const k = kind ?? (label ? bgmForLabel(label) : "solemn");
-  const vol = volume ?? (label ? bgmVolumeForLabel(label) : 0.12);
+  const vol = volume ?? (label ? bgmVolumeForLabel(label) : 0.1);
   return (
     <Audio
       src={staticFile(BGM_FILES[k])}

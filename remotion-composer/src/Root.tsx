@@ -20,6 +20,11 @@ import {
   WorldCupDaily,
   calculateWorldCupDailyMetadataFx,
 } from "./templates/world-cup-daily";
+import {
+  LetterAOriginKids,
+  LETTER_A_DURATION_FRAMES,
+  LetterAOriginKidsProps,
+} from "./kits/letter-a-origin-kids/LetterAOriginKids";
 
 // ---------------------------------------------------------------------------
 // Theme System — prevents every video from looking like dark fintech
@@ -224,6 +229,24 @@ export const Root: React.FC = () => {
           title: "THE CALIBRATORS",
           subtitle: "The People Who Define Reality",
         }}
+      />
+      <Composition
+        id="LetterAOriginKidsMac"
+        component={LetterAOriginKids}
+        durationInFrames={LETTER_A_DURATION_FRAMES}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{ track: "mac" } as LetterAOriginKidsProps}
+      />
+      <Composition
+        id="LetterAOriginKidsGpu"
+        component={LetterAOriginKids}
+        durationInFrames={LETTER_A_DURATION_FRAMES}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{ track: "gpu" } as LetterAOriginKidsProps}
       />
       <Composition
         id="ProductReveal"

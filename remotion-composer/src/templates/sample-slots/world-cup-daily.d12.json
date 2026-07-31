@@ -1,0 +1,92 @@
+{
+  "edition": "Day 12 · June 22, 2026",
+  "host": {
+    "name": "Alan",
+    "voice": "zh-CN-YunxiNeural"
+  },
+  "intro": {
+    "title": "今日世界杯",
+    "subtitle": "小组赛第二轮 · 关键战役",
+    "theme": "world-cup-2026"
+  },
+  "stories": [
+    {
+      "headline": "梅西告别战：阿根廷 2-1 险胜尼日利亚",
+      "body": "第 89 分钟绝杀，全场起立致敬。这是梅西第 26 场世界杯比赛。",
+      "source": "FIFA 官方"
+    },
+    {
+      "headline": "日本 3-0 横扫西班牙，亚洲球队首出线",
+      "body": "三笘薫梅开二度，日本提前一轮锁定 16 强席位。",
+      "source": "新华社"
+    },
+    {
+      "headline": "VAR 争议：法国点球被取消",
+      "body": "姆巴佩禁区倒地，主裁回看 VAR 后未判点球，引发热议。",
+      "source": "队报"
+    }
+  ],
+  "matches": [
+    {
+      "kickoff": "18:00",
+      "teamA": "阿根廷",
+      "teamB": "尼日利亚",
+      "flagA": "🇦🇷",
+      "flagB": "🇳🇬",
+      "scoreA": 2,
+      "scoreB": 1,
+      "stage": "Group F",
+      "venue": "费城 · 林肯金融球场",
+      "status": "final"
+    },
+    {
+      "kickoff": "21:00",
+      "teamA": "日本",
+      "teamB": "西班牙",
+      "flagA": "🇯🇵",
+      "flagB": "🇪🇸",
+      "scoreA": 3,
+      "scoreB": 0,
+      "stage": "Group E",
+      "venue": "温哥华 · BC Place",
+      "status": "final"
+    },
+    {
+      "kickoff": "03:00",
+      "teamA": "法国",
+      "teamB": "丹麦",
+      "flagA": "🇫🇷",
+      "flagB": "🇩🇰",
+      "scoreA": 1,
+      "scoreB": 1,
+      "stage": "Group D",
+      "venue": "多伦多 · BMO 球场",
+      "status": "final"
+    }
+  ],
+  "standings": {
+    "group": "Group F",
+    "rows": [
+      { "pos": 1, "team": "阿根廷", "flag": "🇦🇷", "played": 2, "won": 2, "drawn": 0, "lost": 0, "gf": 5, "ga": 2, "gd": 3, "points": 6 },
+      { "pos": 2, "team": "尼日利亚", "flag": "🇳🇬", "played": 2, "won": 1, "drawn": 0, "lost": 1, "gf": 3, "ga": 3, "gd": 0, "points": 3 },
+      { "pos": 3, "team": "墨西哥", "flag": "🇲🇽", "played": 2, "won": 0, "drawn": 1, "lost": 1, "gf": 2, "ga": 3, "gd": -1, "points": 1 },
+      { "pos": 4, "team": "冰岛", "flag": "🇮🇸", "played": 2, "won": 0, "drawn": 1, "lost": 1, "gf": 1, "ga": 3, "gd": -2, "points": 1 }
+    ]
+  },
+  "outro": {
+    "cta": "关注 · 点赞 · 明日再见"
+  },
+  "narration": {
+    "audioSrc": "wc-d12-narration.mp3",
+    "captions": [
+      { "text": "今日世界杯", "startMs": 500, "endMs": 1500 },
+      { "text": "小组赛第二轮", "startMs": 1500, "endMs": 2800 },
+      { "text": "梅西告别战", "startMs": 3800, "endMs": 4900 },
+      { "text": "阿根廷二比一险胜", "startMs": 4900, "endMs": 6500 },
+      { "text": "日本三比零横扫西班牙", "startMs": 11000, "endMs": 13200 },
+      { "text": "亚洲球队首次出线", "startMs": 13200, "endMs": 15000 },
+      { "text": "法国点球争议", "startMs": 18500, "endMs": 20200 },
+      { "text": "姆巴佩禁区倒地未判", "startMs": 20200, "endMs": 22500 }
+    ]
+  }
+}

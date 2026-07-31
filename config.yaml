@@ -1,10 +1,14 @@
 # OpenMontage - Global Configuration
 
 llm:
-  provider: anthropic            # anthropic | openai | gemini | openrouter | ollama | mistral | minimax
-  model: null                    # null = use provider default
-  temperature: 0.7
-  max_tokens: 4096
+  # 2026-07-15: writing/script 主力走本机 LiteLLM 别名 MiniMax-M3-creative
+  # (上游仍是 MiniMax-M3，LiteLLM 侧 temperature=0.85)。执行/短答可改用 m3。
+  # 接入：OPENAI_BASE_URL=http://127.0.0.1:4000  OPENAI_API_KEY=<LITELLM_MASTER_KEY>
+  # 模型 ID：MiniMax-M3-creative
+  provider: minimax              # anthropic | openai | gemini | openrouter | ollama | mistral | minimax
+  model: MiniMax-M3-creative     # null = provider default; creative = writing 主力
+  temperature: 0.85
+  max_tokens: 8192
 
 budget:
   mode: warn                     # observe | warn | cap
