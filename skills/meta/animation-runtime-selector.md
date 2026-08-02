@@ -3,7 +3,7 @@
 Meta-skill that answers two questions:
 
 1. **Which composition runtime should this video use?** — Remotion, HyperFrames, or FFmpeg.
-2. **Which animation library / Layer 3 skills should this scene reach for?** — Remotion primitives, GSAP plugins, framer-motion, Lottie, Manim, D3.
+2. **Which animation library / Layer 3 skills should this scene reach for?** — Remotion primitives, Three.js, GSAP plugins, framer-motion, Lottie, Manim, D3.
 
 Read this before authoring any animated component or composition, and whenever you're choosing `render_runtime` at proposal time. It routes you to the right Layer 3 skill so you don't waste time hand-rolling what a plugin already solves.
 
@@ -92,6 +92,7 @@ decision matrix and the list of features that stay Remotion-only in Phase 1.
 | Mathematical / scientific visualization | Manim | `.agents/skills/manim-composer`, `.agents/skills/manimce-best-practices` |
 | D3 data-driven visualization | D3 | `.agents/skills/d3-viz` |
 | Data chart (bar/line/pie/KPI) | Remotion built-in chart components | `remotion-composer/SCENE_TYPES.md` |
+| Semantic 3D, exploded object, spatial system, or authored 3D camera move | Remotion + `@remotion/three` + React Three Fiber | `.agents/skills/remotion-best-practices/rules/3d.md` + the relevant `.claude/skills/threejs-*/SKILL.md`; verify with `cd remotion-composer && npm run verify:three:still` |
 | HyperFrames composition — animation knowledge (rules, blueprints, transitions, runtime adapters) | HyperFrames + GSAP default | `.agents/skills/hyperframes-animation` (consolidated motion skill) + `.agents/skills/gsap-core`, `.agents/skills/gsap-timeline` |
 | HyperFrames composition structure (data-* timing, tracks, sub-compositions) | HyperFrames | `.agents/skills/hyperframes-core` |
 | HyperFrames creative direction (palette, type, narration, beat planning) | HyperFrames | `.agents/skills/hyperframes-creative` |
@@ -149,3 +150,5 @@ The asset-director tells you *what* to build in the context of this pipeline. Th
 - ❌ Use GSAP with `requestAnimationFrame` inside Remotion — render will be non-deterministic.
 - ❌ Skip reading the matching Layer 3 skill when a plugin is indicated — per-plugin prompting guidance matters.
 - ❌ Register GSAP plugins inside a component body — register once at module scope or app entry.
+- ❌ Use React Three Fiber's `useFrame()` or browser animation clocks inside Remotion — derive all 3D motion from `useCurrentFrame()`.
+- ❌ Reach for Three.js as decorative spectacle — the shot must need spatial depth to communicate its meaning.

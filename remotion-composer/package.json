@@ -5,24 +5,31 @@
   "scripts": {
     "start": "npx remotion studio",
     "build": "npx remotion render src/index.tsx Explainer out/video.mp4",
+    "typecheck:three": "tsc --noEmit -p tsconfig.three.json",
+    "verify:three:still": "npx remotion still src/three/index.tsx ThreeJsSmoke out/threejs-smoke.png --frame=45 --gl=angle",
+    "verify:three:video": "npx remotion render src/three/index.tsx ThreeJsSmoke out/threejs-smoke.mp4 --gl=angle",
     "upgrade": "npx remotion upgrade"
   },
   "dependencies": {
+    "@react-three/fiber": "8.18.0",
     "@remotion/captions": "^4.0.484",
     "@remotion/cli": "^4.0.484",
     "@remotion/google-fonts": "^4.0.484",
     "@remotion/media": "^4.0.484",
     "@remotion/player": "^4.0.484",
+    "@remotion/three": "4.0.484",
     "@remotion/transitions": "^4.0.484",
     "d3-geo": "^3.1.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "remotion": "^4.0.484",
+    "three": "0.181.2",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
+    "@types/three": "0.181.0",
     "tsx": "^4.23.1",
     "typescript": "^5.3.0"
   }
