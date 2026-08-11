@@ -12,6 +12,7 @@ required_skills:
   - pipelines/comic-nonfiction/executive-producer
   - pipelines/comic-nonfiction/research-director
   - pipelines/comic-nonfiction/content-architecture-director
+  - pipelines/comic-nonfiction/proposal-director
   - pipelines/comic-nonfiction/script-director
   - pipelines/comic-nonfiction/voice-timing-director
   - pipelines/comic-nonfiction/visual-development-director
@@ -51,9 +52,17 @@ stages:
     checkpoint_required: true
     human_approval_default: false
     success_criteria: [Three hook promises, One thesis, Profile-specific structure constraints pass]
+  - name: proposal
+    skill: pipelines/comic-nonfiction/proposal-director
+    required_artifacts_in: [content_architecture, research_brief]
+    produces: [proposal_packet, decision_log]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Both composition runtimes assessed, Runtime choice bundled into CONTENT_GATE rather than creating a fourth human touchpoint]
   - name: script
     skill: pipelines/comic-nonfiction/script-director
-    required_artifacts_in: [content_architecture, research_brief]
+    required_artifacts_in: [content_architecture, research_brief, proposal_packet]
     produces: [script]
     tools_available: []
     checkpoint_required: true

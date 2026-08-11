@@ -13,6 +13,7 @@ required_skills:
   - pipelines/research-report-explainer/intake-director
   - pipelines/research-report-explainer/research-director
   - pipelines/research-report-explainer/content-architecture-director
+  - pipelines/research-report-explainer/proposal-director
   - pipelines/research-report-explainer/script-director
   - pipelines/research-report-explainer/voice-timing-director
   - pipelines/research-report-explainer/scene-director
@@ -59,9 +60,17 @@ stages:
     checkpoint_required: true
     human_approval_default: false
     success_criteria: [Three hook promises, One thesis, Evidence-to-payoff argument map]
+  - name: proposal
+    skill: pipelines/research-report-explainer/proposal-director
+    required_artifacts_in: [content_architecture, research_brief]
+    produces: [proposal_packet, decision_log]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Both composition runtimes assessed, Runtime choice bundled into CONTENT_GATE rather than creating a fourth human touchpoint]
   - name: script
     skill: pipelines/research-report-explainer/script-director
-    required_artifacts_in: [content_architecture, research_brief]
+    required_artifacts_in: [content_architecture, research_brief, proposal_packet]
     produces: [script]
     tools_available: []
     checkpoint_required: true

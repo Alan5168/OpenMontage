@@ -9,6 +9,7 @@ default_checkpoint_policy: guided
 compatible_playbooks: {recommended: [anime-ghibli], custom_allowed: true}
 required_skills:
   - pipelines/anime-hybrid/executive-producer
+  - pipelines/anime-hybrid/proposal-director
   - pipelines/anime-hybrid/scene-director
   - pipelines/anime-hybrid/asset-director
   - pipelines/anime-hybrid/quality-director
@@ -24,7 +25,8 @@ stages:
   - {name: commission, skill: pipelines/anime-hybrid/executive-producer, produces: [brief], tools_available: [], checkpoint_required: true, human_approval_default: false}
   - {name: research, skill: pipelines/anime-hybrid/executive-producer, required_artifacts_in: [brief], produces: [research_brief], tools_available: [], checkpoint_required: true, human_approval_default: false}
   - {name: content_architecture, skill: pipelines/anime-hybrid/executive-producer, required_artifacts_in: [research_brief], produces: [content_architecture], tools_available: [], checkpoint_required: true, human_approval_default: false}
-  - {name: script, skill: pipelines/anime-hybrid/executive-producer, required_artifacts_in: [content_architecture], produces: [script], tools_available: [], checkpoint_required: true, human_approval_default: true}
+  - {name: proposal, skill: pipelines/anime-hybrid/proposal-director, required_artifacts_in: [content_architecture], produces: [proposal_packet, decision_log], tools_available: [], checkpoint_required: true, human_approval_default: false}
+  - {name: script, skill: pipelines/anime-hybrid/executive-producer, required_artifacts_in: [content_architecture, proposal_packet], produces: [script], tools_available: [], checkpoint_required: true, human_approval_default: true}
   - {name: visual_development, skill: pipelines/anime-hybrid/executive-producer, required_artifacts_in: [script], produces: [visual_development], tools_available: [image_selector], checkpoint_required: true, human_approval_default: false}
   - {name: scene_plan, skill: pipelines/anime-hybrid/scene-director, required_artifacts_in: [script, visual_development], produces: [scene_plan], tools_available: [image_selector], checkpoint_required: true, human_approval_default: true}
   - {name: assets, skill: pipelines/anime-hybrid/asset-director, required_artifacts_in: [scene_plan, visual_development], produces: [asset_manifest], tools_available: [image_selector, video_selector, video_compose], checkpoint_required: true, human_approval_default: false}
