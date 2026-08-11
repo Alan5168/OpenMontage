@@ -1,8 +1,13 @@
 import { StringEnum, Type } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { spawn } from "node:child_process";
 
 const REPO = process.env.CONTENT_STUDIO_OM_REPO ?? "C:\\ContentStudio\\repos\\OpenMontage";
 const GATEWAY = `${REPO}\\tools\\content_studio_gateway.py`;
+const QDRANT_EXE = process.env.CONTENT_STUDIO_QDRANT_EXE ?? "C:\\ContentStudio\\tools\\qdrant\\v1.17.1\\qdrant.exe";
+const QDRANT_CONFIG = process.env.CONTENT_STUDIO_QDRANT_CONFIG ?? "C:\\ContentStudio\\runtime\\qdrant\\config.yaml";
+const QDRANT_CWD = process.env.CONTENT_STUDIO_QDRANT_CWD ?? "C:\\ContentStudio\\runtime\\qdrant";
+const QDRANT_COLLECTION = "nf_stock_footage_v1";
 
 type GatewayResult = Record<string, unknown>;
 
@@ -14,6 +19,42 @@ function textResult(payload: GatewayResult) {
 }
 
 export default function contentStudioExtension(pi: ExtensionAPI) {
+  async function qdrantHealth(): Promise<GatewayResult | null> {
+    try {
+      const response = await fetch(`http://127.0.0.1:6333/collections/${QDRANT_COLLECTION}`, {
+        signal: AbortSignal.timeout(2_000),
+      });
+      if (!response.ok) return null;
+      const payload = (await response.json()) as { status?: string; result?: { points_count?: number } };
+      if (payload.status !== "ok") return null;
+      return {
+        status: "PASS",
+        collection: QDRANT_COLLECTION,
+        points_count: payload.result?.points_count,
+        endpoint: "http://127.0.0.1:6333",
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async function ensureQdrant(): Promise<GatewayResult> {
+    const current = await qdrantHealth();
+    if (current) return { ...current, action: "already_running" };
+    const process = spawn(
+      QDRANT_EXE,
+      ["--config-path", QDRANT_CONFIG, "--disable-telemetry"],
+      { cwd: QDRANT_CWD, detached: true, stdio: "ignore", windowsHide: true },
+    );
+    process.unref();
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const health = await qdrantHealth();
+      if (health) return { ...health, action: "started_by_windows_pi" };
+    }
+    throw new Error("Windows Qdrant did not become ready within 30 seconds");
+  }
+
   async function runGateway(
     command: string,
     projectId?: string,
@@ -45,6 +86,22 @@ export default function contentStudioExtension(pi: ExtensionAPI) {
     }
     return payload;
   }
+
+  pi.registerTool({
+    name: "content_studio_media_status",
+    label: "Content Studio Media Runtime Status",
+    description:
+      "Start or verify the Windows-local Qdrant media index. It never contacts Mac and does not change OM project state.",
+    promptSnippet: "Check the Windows-local Content Studio media library and vector index",
+    promptGuidelines: [
+      "Use this tool when Alan asks whether the local media library or stock search is ready.",
+      "Do not claim Windows is canonical; promotion requires two real stock-media projects and Alan approval.",
+    ],
+    parameters: Type.Object({}),
+    async execute() {
+      return textResult(await ensureQdrant());
+    },
+  });
 
   pi.registerTool({
     name: "content_studio_open_current",
