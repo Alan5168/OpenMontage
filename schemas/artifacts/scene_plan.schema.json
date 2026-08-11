@@ -20,6 +20,11 @@
             "enum": ["talking_head", "broll", "animation", "character_scene", "diagram", "text_card", "transition", "generated", "screen_recording"]
           },
           "description": { "type": "string" },
+          "visual_intent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Human-readable picture/action intent, kept separate from the exact provider prompt and generated result"
+          },
           "start_seconds": { "type": "number", "minimum": 0 },
           "end_seconds": { "type": "number", "minimum": 0 },
           "script_section_id": { "type": "string" },
@@ -30,7 +35,7 @@
           "overlay_notes": { "type": "string" },
           "layout_notes": {
             "type": "string",
-            "description": "Seven-column content/camera/acting/layout direction for this cut"
+            "description": "Camera, acting, and layout detail supporting the eight-column scene-plan view"
           },
           "t2i_prompt": {
             "type": "string",
@@ -38,7 +43,7 @@
           },
           "dialogue": {
             "type": "string",
-            "description": "Human narration or character dialogue shown in the seven-column view"
+            "description": "Human narration or character dialogue shown in the eight-column view"
           },
           "voice_segment_ids": {
             "type": "array",
