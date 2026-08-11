@@ -1,0 +1,133 @@
+name: comic-nonfiction
+version: "1.0"
+description: >
+  Evidence-backed original comic nonfiction pipeline shared by longform,
+  knowledge-short, and freshness-gated news profiles. Profiles change thresholds
+  and packaging; the canonical stage graph remains one pipeline until evidence proves otherwise.
+category: animation
+stability: beta
+default_checkpoint_policy: guided
+compatible_playbooks: {recommended: [premium-minimalist], also_works: [flat-motion-graphics], custom_allowed: true}
+required_skills:
+  - pipelines/comic-nonfiction/executive-producer
+  - pipelines/comic-nonfiction/research-director
+  - pipelines/comic-nonfiction/content-architecture-director
+  - pipelines/comic-nonfiction/script-director
+  - pipelines/comic-nonfiction/voice-timing-director
+  - pipelines/comic-nonfiction/visual-development-director
+  - pipelines/comic-nonfiction/scene-director
+  - pipelines/comic-nonfiction/asset-director
+  - pipelines/comic-nonfiction/edit-compose-director
+  - pipelines/comic-nonfiction/quality-director
+  - meta/reviewer
+  - meta/checkpoint-protocol
+orchestration: {mode: executive-producer, skill: pipelines/comic-nonfiction/executive-producer, budget_default_usd: 3.0, max_revisions_per_stage: 3, max_send_backs: 2, max_wall_time_minutes: 240}
+extensions: {custom_scripts: true, custom_playbooks: true, custom_skills: true, custom_tools: false}
+metadata:
+  lifecycle_owner: OpenMontage
+  human_touchpoints: [script, scene_plan, final_gate]
+  profile_split_rule: split_only_if_stage_graph_differs_in_real_fixture
+stages:
+  - name: commission
+    skill: pipelines/comic-nonfiction/executive-producer
+    produces: [brief]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Scenario and profile frozen, Rights and audience intent recorded]
+  - name: research
+    skill: pipelines/comic-nonfiction/research-director
+    required_artifacts_in: [brief]
+    produces: [research_brief]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Claims and uncertainty sourced, News profile includes as_of and kill condition]
+  - name: content_architecture
+    skill: pipelines/comic-nonfiction/content-architecture-director
+    required_artifacts_in: [research_brief]
+    produces: [content_architecture]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Three hook promises, One thesis, Profile-specific structure constraints pass]
+  - name: script
+    skill: pipelines/comic-nonfiction/script-director
+    required_artifacts_in: [content_architecture, research_brief]
+    produces: [script]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    success_criteria: [Chinese human-voice script, CONTENT_GATE pack complete]
+  - name: voice_timing
+    skill: pipelines/comic-nonfiction/voice-timing-director
+    required_artifacts_in: [script]
+    produces: [voice_timing]
+    tools_available: [transcriber]
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Human recording or approved dialogue estimate is canonical, Clock hash and invalidation inputs recorded]
+  - name: visual_development
+    skill: pipelines/comic-nonfiction/visual-development-director
+    required_artifacts_in: [content_architecture, script]
+    produces: [visual_development]
+    tools_available: [image_selector]
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Original style boundary, Character and world continuity, Reuse budget and motion routes]
+  - name: scene_plan
+    skill: pipelines/comic-nonfiction/scene-director
+    required_artifacts_in: [script, voice_timing, visual_development]
+    produces: [scene_plan]
+    tools_available: [image_selector]
+    checkpoint_required: true
+    human_approval_default: true
+    success_criteria: [Seven-column contract validates, API layout references carry provenance, SCENEPLAN_GATE pack complete]
+  - name: assets
+    skill: pipelines/comic-nonfiction/asset-director
+    required_artifacts_in: [scene_plan, visual_development]
+    produces: [asset_manifest]
+    tools_available: [image_selector, video_selector, video_compose]
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Assets join by cut id, H3 is not called before approved scene plan, Readable text is deterministic]
+  - name: edit
+    skill: pipelines/comic-nonfiction/edit-compose-director
+    required_artifacts_in: [scene_plan, asset_manifest, voice_timing]
+    produces: [edit_decisions]
+    tools_available: [subtitle_gen, audio_mixer, video_compose]
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Cut-local edit decisions, Voice clock retained]
+  - name: compose
+    skill: pipelines/comic-nonfiction/edit-compose-director
+    required_artifacts_in: [edit_decisions, asset_manifest]
+    produces: [render_report]
+    tools_available: [video_compose, audio_mixer, video_stitch]
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Hash-bound render, Platform profile enforced]
+  - name: independent_qa
+    skill: pipelines/comic-nonfiction/quality-director
+    required_artifacts_in: [render_report, scene_plan, voice_timing]
+    produces: [final_review]
+    tools_available: [video_analyzer]
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [L0 deterministic gates complete, L1 findings timecoded]
+  - name: final_gate
+    skill: pipelines/comic-nonfiction/quality-director
+    required_artifacts_in: [final_review, render_report]
+    produces: [final_gate]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    success_criteria: [FINAL_GATE proxy ready, One bounded repair or content kill is possible]
+  - name: publish_package
+    skill: pipelines/comic-nonfiction/quality-director
+    required_artifacts_in: [final_gate, render_report]
+    produces: [publish_log]
+    tools_available: [export_bundle]
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Cutdown and retention package prepared, No automatic publish]

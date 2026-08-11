@@ -1,0 +1,133 @@
+name: research-report-explainer
+version: "1.0"
+description: >
+  Document-grounded Chinese explainer pipeline whose canonical lifecycle runs
+  from commission and page-level report intake through human-voice timing,
+  seven-column scene planning, independent QA, final gate, and publish package.
+category: custom
+stability: beta
+default_checkpoint_policy: guided
+compatible_playbooks: {recommended: [premium-minimalist, clean-professional], also_works: [flat-motion-graphics], custom_allowed: true}
+required_skills:
+  - pipelines/research-report-explainer/executive-producer
+  - pipelines/research-report-explainer/intake-director
+  - pipelines/research-report-explainer/research-director
+  - pipelines/research-report-explainer/content-architecture-director
+  - pipelines/research-report-explainer/script-director
+  - pipelines/research-report-explainer/voice-timing-director
+  - pipelines/research-report-explainer/scene-director
+  - pipelines/research-report-explainer/asset-director
+  - pipelines/research-report-explainer/edit-compose-director
+  - pipelines/research-report-explainer/quality-director
+  - meta/reviewer
+  - meta/checkpoint-protocol
+orchestration: {mode: executive-producer, skill: pipelines/research-report-explainer/executive-producer, budget_default_usd: 2.0, max_revisions_per_stage: 3, max_send_backs: 2, max_wall_time_minutes: 180}
+extensions: {custom_scripts: true, custom_playbooks: true, custom_skills: true, custom_tools: false}
+metadata:
+  lifecycle_owner: OpenMontage
+  human_touchpoints: [script, scene_plan, final_gate]
+  source_truth: page_level_report_claims
+stages:
+  - name: commission
+    skill: pipelines/research-report-explainer/intake-director
+    produces: [brief]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Schema-valid brief, Scenario and profile frozen in job_manifest.json]
+  - name: report_intake
+    skill: pipelines/research-report-explainer/intake-director
+    required_artifacts_in: [brief]
+    produces: [report_intake]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Every source has media type, version label, and sha256, Page identity is retained]
+  - name: research
+    skill: pipelines/research-report-explainer/research-director
+    required_artifacts_in: [report_intake]
+    produces: [research_brief]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Claims carry source URL or page and as-of, Counterevidence and uncertainty are explicit]
+  - name: content_architecture
+    skill: pipelines/research-report-explainer/content-architecture-director
+    required_artifacts_in: [research_brief]
+    produces: [content_architecture]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Three hook promises, One thesis, Evidence-to-payoff argument map]
+  - name: script
+    skill: pipelines/research-report-explainer/script-director
+    required_artifacts_in: [content_architecture, research_brief]
+    produces: [script]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    success_criteria: [Chinese human-voice script, Claims remain joined to research, CONTENT_GATE pack complete]
+  - name: voice_timing
+    skill: pipelines/research-report-explainer/voice-timing-director
+    required_artifacts_in: [script]
+    produces: [voice_timing]
+    tools_available: [transcriber]
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Human recording is the canonical clock, Word or line timing joins to script, Re-recording changes clock_hash]
+  - name: scene_plan
+    skill: pipelines/research-report-explainer/scene-director
+    required_artifacts_in: [script, voice_timing, content_architecture]
+    produces: [scene_plan]
+    tools_available: [image_selector]
+    checkpoint_required: true
+    human_approval_default: true
+    success_criteria: [Seven-column contract validates, Every new layout has one API reference or explicit placeholder, SCENEPLAN_GATE pack complete]
+  - name: assets
+    skill: pipelines/research-report-explainer/asset-director
+    required_artifacts_in: [scene_plan, voice_timing]
+    produces: [asset_manifest]
+    tools_available: [image_selector, video_selector, diagram_gen, video_compose]
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: ["Every asset joins by scene_plan.scenes[].id", Readable text is deterministic, Prompt seed model hash and license are recorded]
+  - name: edit
+    skill: pipelines/research-report-explainer/edit-compose-director
+    required_artifacts_in: [scene_plan, asset_manifest, voice_timing]
+    produces: [edit_decisions]
+    tools_available: [subtitle_gen, audio_mixer, video_compose]
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Cut ids equal scene ids, Subtitle clock equals voice timing, Repair scope is cut-local]
+  - name: compose
+    skill: pipelines/research-report-explainer/edit-compose-director
+    required_artifacts_in: [edit_decisions, asset_manifest, voice_timing]
+    produces: [render_report]
+    tools_available: [video_compose, audio_mixer, video_stitch]
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Output hash and media probe recorded, Final hash invalidates on any input hash change]
+  - name: independent_qa
+    skill: pipelines/research-report-explainer/quality-director
+    required_artifacts_in: [render_report, scene_plan, voice_timing]
+    produces: [final_review]
+    tools_available: [video_analyzer]
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Deterministic L0 cannot be overridden by L1, Findings carry timestamps and cut ids]
+  - name: final_gate
+    skill: pipelines/research-report-explainer/quality-director
+    required_artifacts_in: [final_review, render_report]
+    produces: [final_gate]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    success_criteria: [FINAL_GATE proxy and evidence ready, Accepted repair or content-kill decision recorded]
+  - name: publish_package
+    skill: pipelines/research-report-explainer/quality-director
+    required_artifacts_in: [final_gate, render_report]
+    produces: [publish_log]
+    tools_available: [export_bundle]
+    checkpoint_required: true
+    human_approval_default: false
+    success_criteria: [Package is prepared but never auto-published, Retention manifest is present]

@@ -1,0 +1,12 @@
+profile_version: "1.0"
+id: comic_nonfiction_longform_zh
+platform: bilibili_youtube_horizontal
+canvas: {width: 1920, height: 1080, fps: 30, safe_area: {top: 72, right: 96, bottom: 120, left: 96}}
+duration_seconds: {minimum: 480, maximum: 1200}
+language: zh-CN
+narration_mode: HUMAN_VO
+sceneplan_contract: seven-column-v1
+source_policy: GENERATED_ORIGINAL_ONLY
+quality_thresholds: {subtitle_safe_area_required: true, black_frame_max_seconds: 0.10, freeze_frame_max_seconds: 1.00, integrated_lufs_target: -16, true_peak_max_dbtp: -1.5, vo_bgm_min_db: 9}
+provider_policy: {image_capability: image_generation, video_capability: video_generation, static_image_via_video_provider_forbidden: true, image_allowlist: [volcengine], video_allowlist: [comfyui, video-gen-pool], local_video_equipment: [h3-comfyui, remotion]}
+metadata: {minimum_independent_sources: 2, counterargument_required: true, cutdown_count: "3-5"}

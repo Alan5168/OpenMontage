@@ -1,0 +1,12 @@
+profile_version: "1.0"
+id: licensed_documentary_montage
+platform: horizontal_documentary
+canvas: {width: 1920, height: 1080, fps: 30, safe_area: {top: 72, right: 96, bottom: 120, left: 96}}
+duration_seconds: {minimum: 60, maximum: 1200}
+language: multilingual
+narration_mode: SOURCE_MEDIA
+sceneplan_contract: seven-column-v1
+source_policy: LICENSED_FOOTAGE_REQUIRED
+quality_thresholds: {subtitle_safe_area_required: true, black_frame_max_seconds: 0.10, freeze_frame_max_seconds: 1.00, integrated_lufs_target: -16, true_peak_max_dbtp: -1.5, vo_bgm_min_db: null}
+provider_policy: {image_capability: image_generation, video_capability: video_generation, static_image_via_video_provider_forbidden: true, image_allowlist: [], video_allowlist: [licensed-stock], local_video_equipment: [remotion]}
+metadata: {url_license_provenance_required: true}

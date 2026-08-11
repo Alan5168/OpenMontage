@@ -1,0 +1,69 @@
+catalog_version: "1.0"
+distribution_id: alan-content-studio-v1
+scenarios:
+  - id: report_explainer_xhs_zh
+    title: 中文研报小红书竖版解读
+    description: Document-grounded vertical explainer with human Mandarin narration.
+    pipeline: research-report-explainer
+    profile: report_explainer_xhs_zh
+    source_policy: RESEARCH_ONLY
+    maturity: FIXTURE_PASS
+    human_touchpoints: [CONTENT_GATE, SCENEPLAN_GATE, FINAL_GATE]
+    provider_policy: {image_capability: image_generation, video_capability: video_generation, allow_local_video: true}
+  - id: report_explainer_bili_vertical_zh
+    title: 中文研报 B站竖版深度解读
+    description: A deeper vertical report explainer with an independent script and export gate.
+    pipeline: research-report-explainer
+    profile: report_explainer_bili_vertical_zh
+    source_policy: RESEARCH_ONLY
+    maturity: FIXTURE_PASS
+    human_touchpoints: [CONTENT_GATE, SCENEPLAN_GATE, FINAL_GATE]
+    provider_policy: {image_capability: image_generation, video_capability: video_generation, allow_local_video: true}
+  - id: comic_nonfiction_longform_zh
+    title: 中文漫画非虚构长视频
+    description: Evidence-backed 8–20 minute horizontal comic nonfiction.
+    pipeline: comic-nonfiction
+    profile: comic_nonfiction_longform_zh
+    source_policy: GENERATED_ORIGINAL_ONLY
+    maturity: FIXTURE_PASS
+    human_touchpoints: [CONTENT_GATE, SCENEPLAN_GATE, FINAL_GATE]
+    provider_policy: {image_capability: image_generation, video_capability: video_generation, allow_local_video: true}
+  - id: comic_nonfiction_short_knowledge_zh
+    title: 中文漫画知识短视频
+    description: One-thesis 60–180 second original animated knowledge explainer.
+    pipeline: comic-nonfiction
+    profile: comic_nonfiction_short_knowledge_zh
+    source_policy: GENERATED_ORIGINAL_ONLY
+    maturity: FIXTURE_PASS
+    human_touchpoints: [CONTENT_GATE, SCENEPLAN_GATE, FINAL_GATE]
+    provider_policy: {image_capability: image_generation, video_capability: video_generation, allow_local_video: true}
+  - id: comic_nonfiction_short_news_zh
+    title: 中文漫画资讯短视频
+    description: Freshness-gated 45–120 second original animated news explainer.
+    pipeline: comic-nonfiction
+    profile: comic_nonfiction_short_news_zh
+    source_policy: RESEARCH_ONLY
+    maturity: FIXTURE_PASS
+    human_touchpoints: [CONTENT_GATE, SCENEPLAN_GATE, FINAL_GATE]
+    provider_policy: {image_capability: image_generation, video_capability: video_generation, allow_local_video: true}
+  - id: fiction_anime_episode
+    title: Fiction anime episode
+    description: Continuity-led fiction/anime production with character bible and bounded motion routing.
+    pipeline: anime-hybrid
+    profile: fiction_anime_episode
+    source_policy: GENERATED_ORIGINAL_ONLY
+    maturity: FIXTURE_PASS
+    human_touchpoints: [CONTENT_GATE, SCENEPLAN_GATE, FINAL_GATE]
+    provider_policy: {image_capability: image_generation, video_capability: video_generation, allow_local_video: true}
+  - id: licensed_documentary_montage
+    title: Licensed documentary montage
+    description: Retrieval-led documentary montage with mandatory URL, license, and provenance.
+    pipeline: documentary-montage
+    profile: licensed_documentary_montage
+    source_policy: LICENSED_FOOTAGE_REQUIRED
+    maturity: FIXTURE_PASS
+    human_touchpoints: [CONTENT_GATE, SCENEPLAN_GATE, FINAL_GATE]
+    provider_policy: {image_capability: image_generation, video_capability: video_generation, allow_local_video: false}
+metadata:
+  lifecycle_owner: OpenMontage
+  router_behavior: declarative_validate_freeze_only

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/scenarios/scenario_catalog",
+  "title": "Scenario Catalog",
+  "description": "Versioned user-facing scenario registry. A scenario resolves to one pipeline and one profile without creating a second workflow engine.",
+  "type": "object",
+  "required": ["catalog_version", "distribution_id", "scenarios"],
+  "properties": {
+    "catalog_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+    "distribution_id": { "type": "string", "minLength": 1 },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "pipeline", "profile", "source_policy", "maturity", "human_touchpoints"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+          "title": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "pipeline": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "profile": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+          "source_policy": {
+            "type": "string",
+            "enum": ["RESEARCH_ONLY", "LICENSED_FOOTAGE_REQUIRED", "SOURCE_MEDIA_REQUIRED", "GENERATED_ORIGINAL_ONLY"]
+          },
+          "maturity": {
+            "type": "string",
+            "enum": ["DECLARED", "FIXTURE_PASS", "PILOT_PASS", "PRODUCTION_ACCEPTED"]
+          },
+          "human_touchpoints": {
+            "type": "array",
+            "prefixItems": [
+              { "const": "CONTENT_GATE" },
+              { "const": "SCENEPLAN_GATE" },
+              { "const": "FINAL_GATE" }
+            ],
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "provider_policy": {
+            "type": "object",
+            "properties": {
+              "image_capability": { "const": "image_generation" },
+              "video_capability": { "const": "video_generation" },
+              "allow_local_video": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "metadata": { "type": "object" }
+  },
+  "additionalProperties": false
+}

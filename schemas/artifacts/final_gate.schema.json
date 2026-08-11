@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/final_gate",
+  "title": "Final Gate",
+  "type": "object",
+  "required": ["version", "final_sha256", "l0", "l1", "status", "input_hashes"],
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+    "final_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "l0": {
+      "type": "object",
+      "required": ["status", "checks"],
+      "properties": {
+        "status": { "type": "string", "enum": ["PASS", "FAIL"] },
+        "checks": { "type": "array", "minItems": 1, "items": { "type": "object" } }
+      },
+      "additionalProperties": false
+    },
+    "l1": {
+      "type": "object",
+      "required": ["status", "timecoded_findings"],
+      "properties": {
+        "status": { "type": "string", "enum": ["PASS", "FAIL", "ADVISORY"] },
+        "timecoded_findings": { "type": "array", "items": { "type": "object" } }
+      },
+      "additionalProperties": false
+    },
+    "status": { "type": "string", "enum": ["PASS", "FAIL", "TECHNICAL_PASS_CONTENT_KILL"] },
+    "input_hashes": {
+      "type": "object",
+      "required": ["scene_plan", "voice_timing", "render_report"],
+      "properties": {
+        "scene_plan": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "voice_timing": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "render_report": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "metadata": { "type": "object" }
+  },
+  "additionalProperties": false
+}

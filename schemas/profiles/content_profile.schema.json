@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/profiles/content_profile",
+  "title": "Content Profile",
+  "description": "Platform, language, timing, quality, and provider-policy overlay for a pipeline.",
+  "type": "object",
+  "required": ["profile_version", "id", "platform", "canvas", "duration_seconds", "language", "narration_mode", "sceneplan_contract", "source_policy", "quality_thresholds", "provider_policy"],
+  "properties": {
+    "profile_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "platform": { "type": "string", "minLength": 1 },
+    "canvas": {
+      "type": "object",
+      "required": ["width", "height", "fps", "safe_area"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 320 },
+        "height": { "type": "integer", "minimum": 320 },
+        "fps": { "type": "integer", "minimum": 1, "maximum": 120 },
+        "safe_area": {
+          "type": "object",
+          "required": ["top", "right", "bottom", "left"],
+          "properties": {
+            "top": { "type": "integer", "minimum": 0 },
+            "right": { "type": "integer", "minimum": 0 },
+            "bottom": { "type": "integer", "minimum": 0 },
+            "left": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "duration_seconds": {
+      "type": "object",
+      "required": ["minimum", "maximum"],
+      "properties": {
+        "minimum": { "type": "number", "minimum": 1 },
+        "maximum": { "type": "number", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "language": { "type": "string", "minLength": 2 },
+    "narration_mode": { "type": "string", "enum": ["HUMAN_VO", "DIALOGUE_OR_ESTIMATE", "SOURCE_MEDIA"] },
+    "sceneplan_contract": { "const": "seven-column-v1" },
+    "source_policy": {
+      "type": "string",
+      "enum": ["RESEARCH_ONLY", "LICENSED_FOOTAGE_REQUIRED", "SOURCE_MEDIA_REQUIRED", "GENERATED_ORIGINAL_ONLY"]
+    },
+    "quality_thresholds": {
+      "type": "object",
+      "required": ["subtitle_safe_area_required", "black_frame_max_seconds", "freeze_frame_max_seconds"],
+      "properties": {
+        "subtitle_safe_area_required": { "type": "boolean" },
+        "black_frame_max_seconds": { "type": "number", "minimum": 0 },
+        "freeze_frame_max_seconds": { "type": "number", "minimum": 0 },
+        "integrated_lufs_target": { "type": ["number", "null"] },
+        "true_peak_max_dbtp": { "type": ["number", "null"] },
+        "vo_bgm_min_db": { "type": ["number", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "provider_policy": {
+      "type": "object",
+      "required": ["image_capability", "video_capability", "static_image_via_video_provider_forbidden"],
+      "properties": {
+        "image_capability": { "const": "image_generation" },
+        "video_capability": { "const": "video_generation" },
+        "static_image_via_video_provider_forbidden": { "const": true },
+        "image_allowlist": { "type": "array", "items": { "type": "string" } },
+        "video_allowlist": { "type": "array", "items": { "type": "string" } },
+        "local_video_equipment": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "metadata": { "type": "object" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/content_architecture",
+  "title": "Content Architecture",
+  "type": "object",
+  "required": ["version", "audience_problem", "thesis", "viewer_change", "hooks", "structure", "visual_opportunities"],
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+    "audience_problem": { "type": "string", "minLength": 1 },
+    "thesis": { "type": "string", "minLength": 1 },
+    "viewer_change": { "type": "string", "minLength": 1 },
+    "hooks": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["text", "promise"],
+        "properties": {
+          "text": { "type": "string", "minLength": 1 },
+          "promise": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "structure": {
+      "type": "object",
+      "required": ["opening_promise", "evidence_or_conflict", "turn", "payoff", "takeaway"],
+      "properties": {
+        "opening_promise": { "type": "string", "minLength": 1 },
+        "evidence_or_conflict": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "turn": { "type": "string", "minLength": 1 },
+        "payoff": { "type": "string", "minLength": 1 },
+        "takeaway": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "visual_opportunities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["beat", "opportunity"],
+        "properties": {
+          "beat": { "type": "string", "minLength": 1 },
+          "opportunity": { "type": "string", "minLength": 1 },
+          "provider_decided": { "type": "boolean", "const": false }
+        },
+        "additionalProperties": false
+      }
+    },
+    "as_of": { "type": ["string", "null"] },
+    "metadata": { "type": "object" }
+  },
+  "additionalProperties": false
+}

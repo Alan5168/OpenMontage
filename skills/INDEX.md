@@ -138,6 +138,16 @@ Pipeline type skills provide production guidance for specific video formats, ind
 
 Stage director skills teach the agent HOW to execute each pipeline stage. Each skill is a detailed markdown file with process steps, quality rubrics, and self-evaluation criteria.
 
+### Localized Content Studio Pipelines
+
+These clean-room pipelines share the canonical OpenMontage lifecycle and checkpoint protocol. Their scenario-specific defaults live in `scenarios/catalog.yaml` and `profiles/`; the pipeline definitions remain the execution source of truth.
+
+| Pipeline | Director skills | Lifecycle emphasis |
+|----------|-----------------|--------------------|
+| Research Report Explainer | `pipelines/research-report-explainer/` | Intake, evidence architecture, script, voice timing, seven-column scene plan, assets, compose, independent QA, final gate |
+| Comic Nonfiction | `pipelines/comic-nonfiction/` | Research-backed short/long Chinese nonfiction, reusable visual language, voice-first timing, seven-column review |
+| Anime Hybrid | `pipelines/anime-hybrid/` | Fiction continuity, static-layout-first routing, explicit opt-in motion, world-state and final human gate |
+
 ### Animated Explainer Pipeline (`pipelines/explainer/`) — v2.0
 
 | Skill | File | Stage | Key Capabilities |

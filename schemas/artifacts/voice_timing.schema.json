@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/voice_timing",
+  "title": "Voice Timing",
+  "type": "object",
+  "required": ["version", "clock_source", "source_audio", "alignment", "segments", "clock_hash"],
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+    "clock_source": { "type": "string", "enum": ["HUMAN_VO", "DIALOGUE_OR_ESTIMATE", "SOURCE_MEDIA"] },
+    "source_audio": {
+      "type": "object",
+      "required": ["path", "sha256", "duration_seconds"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "duration_seconds": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "alignment": {
+      "type": "object",
+      "required": ["method", "transcript_sha256"],
+      "properties": {
+        "method": { "type": "string", "enum": ["ASR", "FORCE_ALIGNMENT", "MANUAL_ESTIMATE"] },
+        "engine": { "type": ["string", "null"] },
+        "transcript_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "segments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "start_seconds", "end_seconds"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "text": { "type": "string" },
+          "start_seconds": { "type": "number", "minimum": 0 },
+          "end_seconds": { "type": "number", "exclusiveMinimum": 0 },
+          "words": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["text", "start_seconds", "end_seconds"],
+              "properties": {
+                "text": { "type": "string" },
+                "start_seconds": { "type": "number", "minimum": 0 },
+                "end_seconds": { "type": "number", "exclusiveMinimum": 0 }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "clock_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "invalidates_on": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["source_audio.sha256", "alignment.transcript_sha256"] }
+    },
+    "metadata": { "type": "object" }
+  },
+  "additionalProperties": false
+}

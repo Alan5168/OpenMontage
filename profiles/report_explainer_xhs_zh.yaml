@@ -1,0 +1,12 @@
+profile_version: "1.0"
+id: report_explainer_xhs_zh
+platform: xiaohongshu_vertical
+canvas: {width: 1080, height: 1920, fps: 30, safe_area: {top: 180, right: 72, bottom: 260, left: 72}}
+duration_seconds: {minimum: 30, maximum: 180}
+language: zh-CN
+narration_mode: HUMAN_VO
+sceneplan_contract: seven-column-v1
+source_policy: RESEARCH_ONLY
+quality_thresholds: {subtitle_safe_area_required: true, black_frame_max_seconds: 0.10, freeze_frame_max_seconds: 0.50, integrated_lufs_target: -16, true_peak_max_dbtp: -1.5, vo_bgm_min_db: 9}
+provider_policy: {image_capability: image_generation, video_capability: video_generation, static_image_via_video_provider_forbidden: true, image_allowlist: [volcengine], video_allowlist: [comfyui, video-gen-pool], local_video_equipment: [h3-comfyui]}
+metadata: {voice_clock: human_recording_alignment, readable_text_layer: deterministic_only}
