@@ -8,6 +8,8 @@ const QDRANT_EXE = process.env.CONTENT_STUDIO_QDRANT_EXE ?? "C:\\ContentStudio\\
 const QDRANT_CONFIG = process.env.CONTENT_STUDIO_QDRANT_CONFIG ?? "C:\\ContentStudio\\runtime\\qdrant\\config.yaml";
 const QDRANT_CWD = process.env.CONTENT_STUDIO_QDRANT_CWD ?? "C:\\ContentStudio\\runtime\\qdrant";
 const QDRANT_COLLECTION = "nf_stock_footage_v1";
+const PRIME_CLI_JS = process.env.PRIME_AGENT_CLI_JS
+  ?? `${process.env.APPDATA}\\npm\\node_modules\\prime-agent\\dist\\bundle\\cli.js`;
 
 type GatewayResult = Record<string, unknown>;
 
@@ -172,16 +174,20 @@ export default function contentStudioExtension(pi: ExtensionAPI) {
     }),
     async execute(_toolCallId, params, signal) {
       const request = await runGateway("prepare-resume", params.projectId, [], signal);
+      const expectedAcknowledgement = {
+        status: "PRIME_OM_RESUME_ACCEPTED",
+        project_id: request.project_id,
+        checkpoint_sha256: request.checkpoint_sha256,
+        next_stage: request.next_stage,
+      };
       const prompt = [
-        "You are Windows Prime Agent receiving a resume request from OpenMontage through Windows Pi.",
-        "Acknowledge the checkpoint only. Do not call tools, generate assets, or start rendering.",
-        "Return exactly one JSON object and no markdown with these fields:",
-        "status=PRIME_OM_RESUME_ACCEPTED, project_id, checkpoint_sha256, next_stage.",
-        `REQUEST=${JSON.stringify(request)}`,
+        "Return exactly this JSON object and no markdown or other text:",
+        JSON.stringify(expectedAcknowledgement),
       ].join("\n");
       const prime = await pi.exec(
-        "prime-agent",
+        "node",
         [
+          PRIME_CLI_JS,
           "-p",
           "--no-tools",
           "--no-context-files",
