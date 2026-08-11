@@ -338,6 +338,33 @@ class TestStoryboardVisualSelection:
         assert card["visual"] is not None
         assert card["visual"]["exists"] is False
 
+
+def test_seven_column_fields_surface_without_replacing_final_asset(projects_root):
+    p = _make_project(projects_root, "seven")
+    (p / "assets" / "images" / "layout.png").write_bytes(b"fixture")
+    plan = {
+        "version": "1.0",
+        "scenes": [{
+            "id": "c001", "type": "generated", "description": "layout",
+            "script_section_id": "s1", "start_seconds": 0, "end_seconds": 2,
+            "layout_notes": "wide", "t2i_prompt": "textless wide layout",
+            "dialogue": "旁白", "voice_segment_ids": ["v1"],
+            "visual_ref": {"kind": "api_image", "path": "assets/images/layout.png"},
+            "sound_intent": {"se": [], "bgm_mood": "quiet"},
+            "motion_route": "REMOTION", "review_decision": "keep",
+        }],
+        "metadata": {"presentation_contract": "seven-column-v1"},
+    }
+    _write(p / "artifacts" / "scene_plan.json", plan)
+    state = load_board_state(p)
+    board = state["storyboard"]
+    card = board["scenes"][0]
+    assert board["presentation_contract"] == "seven-column-v1"
+    assert card["layout_visual"]["exists"] is True
+    assert card["t2i_prompt"] == "textless wide layout"
+    assert card["review_decision"] == "keep"
+    assert card["visual"] is None
+
     def test_renderable_prefers_existing_and_takes_exclude_missing(self, projects_root):
         # Two takes: one real png, one missing. Active = the real one;
         # takes carries only renderable (showable) entries.

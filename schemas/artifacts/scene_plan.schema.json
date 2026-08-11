@@ -28,6 +28,81 @@
           "transition_in": { "type": "string" },
           "transition_out": { "type": "string" },
           "overlay_notes": { "type": "string" },
+          "layout_notes": {
+            "type": "string",
+            "description": "Seven-column content/camera/acting/layout direction for this cut"
+          },
+          "t2i_prompt": {
+            "type": "string",
+            "description": "Exact prompt used only for the scene-plan layout reference"
+          },
+          "dialogue": {
+            "type": "string",
+            "description": "Human narration or character dialogue shown in the seven-column view"
+          },
+          "voice_segment_ids": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Join from this cut to canonical voice_timing.segments[].id"
+          },
+          "visual_ref": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": {
+              "kind": { "type": "string", "enum": ["api_image", "local_image", "placeholder"] },
+              "path": { "type": "string" },
+              "placeholder_reason": { "type": "string" }
+            },
+            "additionalProperties": false
+          },
+          "reuse": {
+            "type": "object",
+            "required": ["source_cut_id", "kind"],
+            "properties": {
+              "source_cut_id": { "type": "string", "minLength": 1 },
+              "kind": { "type": "string", "enum": ["same_layout", "same_position", "compatible_asset"] }
+            },
+            "additionalProperties": false
+          },
+          "sound_intent": {
+            "type": "object",
+            "required": ["se", "bgm_mood"],
+            "properties": {
+              "se": { "type": "array", "items": { "type": "string" } },
+              "bgm_mood": { "type": "string" },
+              "silence": { "type": "boolean", "default": false },
+              "transition": { "type": "string" }
+            },
+            "additionalProperties": false
+          },
+          "image_provenance": {
+            "type": "object",
+            "required": ["provider", "model", "seed", "size", "request_id", "cost_or_plan_usage", "output_hash", "license_policy"],
+            "properties": {
+              "provider": { "type": "string", "minLength": 1 },
+              "model": { "type": "string", "minLength": 1 },
+              "seed": { "type": ["integer", "null"] },
+              "size": { "type": "string", "minLength": 1 },
+              "request_id": { "type": "string", "minLength": 1 },
+              "cost_or_plan_usage": { "type": ["number", "string", "object"] },
+              "output_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "license_policy": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          },
+          "motion_route": {
+            "type": "string",
+            "enum": ["H3", "I2V", "T2V", "2_5D", "REMOTION", "PROGRAMMATIC", "HOLD"]
+          },
+          "world_state": { "type": "object" },
+          "flags": { "type": "array", "items": { "type": "string" } },
+          "review_decision": {
+            "type": "string",
+            "enum": ["pending", "keep", "change", "merge", "omit"],
+            "default": "pending"
+          },
+          "review_notes": { "type": "string" },
+          "merge_target_id": { "type": "string" },
           "shot_language": {
             "type": "object",
             "description": "Structured cinematography vocabulary for this scene",

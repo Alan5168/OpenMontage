@@ -19,6 +19,7 @@ let selectedStage = null;   // stage drawer open for this stage name
 let activeRender = 0;
 let replay = null;          // {t0, t1, t, playing} — replay mode when non-null
 let firstPaint = true;
+const sceneplanReviewDrafts = new Map(); // project/cut -> reviewer-only patch fields
 
 function applyTheme(theme) {
   currentTheme = theme === "light" ? "light" : "dark";
@@ -812,6 +813,102 @@ function renderStoryboard(s) {
     el("div", { class: "strip-outer" }, strip));
 }
 
+function renderSevenColumnStoryboard(s) {
+  const board = s.storyboard;
+  if (!board || board.presentation_contract !== "seven-column-v1") return null;
+  const rows = board.scenes.map((card) => {
+    let visual;
+    const ref = card.layout_visual;
+    if (ref && ref.exists && ref.path) {
+      visual = el("img", { src: thumbURL(s.project_id, ref.path, 480), loading: "lazy", alt: `layout ${card.id}` });
+    } else if (card.reuse) {
+      visual = el("div", { class: "ref-placeholder" }, `REUSE → ${card.reuse.source_cut_id}`);
+    } else {
+      visual = el("div", { class: "ref-placeholder" }, (ref && ref.placeholder_reason) || "NO LAYOUT REF");
+    }
+    const sound = card.sound_intent || {};
+    const seconds = `${Number(card.start_seconds || 0).toFixed(2)}–${Number(card.end_seconds || 0).toFixed(2)}s`;
+    const draftKey = `${s.project_id}/${card.id}`;
+    const saved = sceneplanReviewDrafts.get(draftKey) || {};
+    const decision = saved.review_decision || card.review_decision || "pending";
+    const decisionSelect = el("select", {
+      class: "cut-decision-select",
+      "aria-label": `Review decision for ${card.id}`,
+      onchange: (event) => {
+        const current = sceneplanReviewDrafts.get(draftKey) || {};
+        sceneplanReviewDrafts.set(draftKey, { ...current, review_decision: event.target.value });
+      },
+    }, ...["pending", "keep", "change", "merge", "omit"].map((value) =>
+      el("option", { value, selected: value === decision ? "" : null }, value.toUpperCase())));
+    const noteInput = el("input", {
+      class: "cut-review-note",
+      type: "text",
+      value: saved.review_notes ?? card.review_notes ?? "",
+      placeholder: "review note / merge target",
+      "aria-label": `Review note for ${card.id}`,
+      oninput: (event) => {
+        const current = sceneplanReviewDrafts.get(draftKey) || {};
+        sceneplanReviewDrafts.set(draftKey, { ...current, review_notes: event.target.value });
+      },
+    });
+    return el("tr", {},
+      el("td", { class: "col-scene" }, card.script_section_id || "—"),
+      el("td", { class: "col-cut" }, card.id),
+      el("td", { class: "col-visual" }, visual),
+      el("td", { class: "col-content" },
+        el("div", { class: "layout-notes" }, card.layout_notes || card.description || ""),
+        card.t2i_prompt ? el("details", {}, el("summary", {}, "layout prompt"), el("code", {}, card.t2i_prompt)) : null,
+        el("span", { class: "route" }, card.motion_route || "")),
+      el("td", { class: "col-dialogue" }, card.dialogue || ""),
+      el("td", { class: "col-seconds" }, seconds),
+      el("td", { class: "col-sound" },
+        el("div", {}, (sound.se || []).join(" · ") || "—"),
+        el("small", {}, sound.bgm_mood || ""),
+        el("span", { class: `cut-decision ${decision}` }, decision.toUpperCase()),
+        decisionSelect,
+        noteInput),
+    );
+  });
+  const table = el("table", { class: "seven-col-table" },
+    el("thead", {}, el("tr", {},
+      ["S 场景", "C 镜头", "画面", "内容 / 摄影 / Prompt", "台词", "秒数", "音响 / 决策"]
+        .map((label) => el("th", {}, label)))),
+    el("tbody", {}, rows));
+  const exportButton = el("button", {
+    class: "sceneplan-export",
+    type: "button",
+    onclick: () => {
+      const decisions = board.scenes.map((card) => {
+        const saved = sceneplanReviewDrafts.get(`${s.project_id}/${card.id}`) || {};
+        return {
+          cut_id: card.id,
+          review_decision: saved.review_decision || card.review_decision || "pending",
+          review_notes: saved.review_notes ?? card.review_notes ?? "",
+        };
+      });
+      const patch = {
+        contract: "sceneplan-review-patch-v1",
+        project_id: s.project_id,
+        scene_plan_ssot: "scene_plan.scenes[].id",
+        exported_at: new Date().toISOString(),
+        decisions,
+      };
+      const blob = new Blob([`${JSON.stringify(patch, null, 2)}\n`], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${s.project_id}-sceneplan-review.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    },
+  }, "Export cut decisions");
+  return el("div", { class: "seven-col-wrap" },
+    el("div", { class: "section-title" }, "Seven-column scene plan",
+      el("span", { class: "meta" }, `${board.scenes.length} cuts · scene_plan.scenes[].id is SSOT`),
+      exportButton),
+    table);
+}
+
 // ---------------------------------------------------------------------------
 // renders + degraded media
 // ---------------------------------------------------------------------------
@@ -1082,18 +1179,19 @@ function render() {
 
   // Media sections live INSIDE the main column so a tall decisions rail
   // never pushes them below the fold — the column flows beside the rail.
+  const sevenColumn = renderSevenColumnStoryboard(s);
   const storyboard = renderStoryboard(s);
   const found = renderFoundMedia(s);
   const renders = renderRenders(s);
 
   if (approvalReview || script || decisions || activity) {
-    for (const section of [storyboard, found, renders]) {
+    for (const section of [sevenColumn, storyboard, found, renders]) {
       if (section) main.append(section);
     }
     const hasAside = Boolean(decisions || activity);
     app.append(el("div", { class: `board${hasAside ? "" : " solo"}` }, main, hasAside ? aside : null));
   } else {
-    for (const section of [storyboard, found, renders]) {
+    for (const section of [sevenColumn, storyboard, found, renders]) {
       if (section) app.append(section);
     }
   }

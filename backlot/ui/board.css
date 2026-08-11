@@ -677,6 +677,38 @@ aside .panel:nth-of-type(1) { animation-delay: .32s } aside .panel:nth-of-type(2
 @keyframes blink { 50% { opacity: .45; } }
 
 /* ---------- filmstrip ---------- */
+.seven-col-wrap { margin: 12px 0 28px; overflow-x: auto; }
+.seven-col-table { width: 100%; min-width: 1240px; border-collapse: collapse; table-layout: fixed; background: var(--surface-1); }
+.seven-col-table th, .seven-col-table td { border: 1px solid var(--border); padding: 9px; vertical-align: top; }
+.seven-col-table th { font-family: var(--mono); font-size: calc(10px * var(--fs-scale)); color: var(--text-3); letter-spacing: .06em; text-align: left; background: var(--surface-2); }
+.seven-col-table td { font-size: calc(11px * var(--fs-scale)); color: var(--text-2); line-height: 1.45; }
+.seven-col-table .col-scene { width: 7%; font-family: var(--mono); }
+.seven-col-table .col-cut { width: 7%; font-family: var(--mono); color: var(--amber); }
+.seven-col-table .col-visual { width: 17%; }
+.seven-col-table .col-content { width: 28%; }
+.seven-col-table .col-dialogue { width: 18%; }
+.seven-col-table .col-seconds { width: 8%; font-family: var(--mono); white-space: nowrap; }
+.seven-col-table .col-sound { width: 15%; }
+.seven-col-table img { width: 100%; max-height: 150px; object-fit: cover; border-radius: 5px; display: block; }
+.seven-col-table details { margin-top: 7px; color: var(--text-3); }
+.seven-col-table details code { display: block; margin-top: 5px; white-space: normal; font-size: calc(9px * var(--fs-scale)); }
+.seven-col-table .route { display: inline-block; margin-top: 7px; font-family: var(--mono); color: var(--amber); }
+.ref-placeholder { min-height: 90px; border: 1px dashed var(--border); border-radius: 5px; display: grid; place-items: center; padding: 8px; text-align: center; font-family: var(--mono); font-size: calc(9px * var(--fs-scale)); color: var(--text-3); }
+.cut-decision { display: inline-block; margin-top: 8px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 99px; font-family: var(--mono); font-size: calc(9px * var(--fs-scale)); color: var(--text-3); }
+.cut-decision.keep { color: var(--green); border-color: rgba(79,194,131,.35); }
+.cut-decision.change, .cut-decision.merge { color: var(--amber); border-color: rgba(240,168,60,.35); }
+.cut-decision.omit { color: var(--red); border-color: rgba(229,84,75,.35); }
+.cut-decision-select, .cut-review-note {
+  width: 100%; margin-top: 7px; border: 1px solid var(--border); border-radius: 5px;
+  background: var(--surface-2); color: var(--text-2); font-family: var(--mono);
+  font-size: calc(9px * var(--fs-scale)); padding: 5px 6px;
+}
+.sceneplan-export {
+  margin-left: auto; border: 1px solid var(--amber); border-radius: 6px; padding: 6px 9px;
+  background: transparent; color: var(--amber); font-family: var(--mono);
+  font-size: calc(9px * var(--fs-scale)); cursor: pointer;
+}
+.sceneplan-export:hover { background: color-mix(in srgb, var(--amber) 10%, transparent); }
 .strip-outer { position: relative; }
 .filmstrip {
   display: flex; gap: 12px; overflow-x: auto; padding: 26px 4px;

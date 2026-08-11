@@ -1,0 +1,63 @@
+{
+  "version": "1.0",
+  "scenes": [
+    {
+      "id": "c001",
+      "type": "generated",
+      "description": "A paper map folds into a glowing network.",
+      "script_section_id": "s1",
+      "start_seconds": 0,
+      "end_seconds": 3,
+      "layout_notes": "Wide top-down layout; map centered; slow push-in; no readable text.",
+      "t2i_prompt": "textless editorial animation layout, top-down paper map folding into a luminous network, wide composition, clean negative space",
+      "dialogue": "一张地图，正在变成一张网络。",
+      "voice_segment_ids": ["v1"],
+      "visual_ref": {"kind": "api_image", "path": "assets/images/c001-layout.png"},
+      "sound_intent": {"se": ["paper fold"], "bgm_mood": "curious pulse", "silence": false},
+      "image_provenance": {
+        "provider": "fixture",
+        "model": "fixture-image-v1",
+        "seed": 42,
+        "size": "1080x1920",
+        "request_id": "fixture-c001",
+        "cost_or_plan_usage": "fixture",
+        "output_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "license_policy": "fixture-only"
+      },
+      "motion_route": "REMOTION",
+      "review_decision": "keep"
+    },
+    {
+      "id": "c002",
+      "type": "animation",
+      "description": "Reuse the same map while three nodes light up.",
+      "script_section_id": "s2",
+      "start_seconds": 3,
+      "end_seconds": 6,
+      "layout_notes": "Same position as c001; animate only three nodes and connecting paths.",
+      "dialogue": "真正的变化，发生在三个节点。",
+      "voice_segment_ids": ["v2"],
+      "reuse": {"source_cut_id": "c001", "kind": "same_position"},
+      "sound_intent": {"se": ["three soft pings"], "bgm_mood": "curious pulse", "silence": false},
+      "motion_route": "REMOTION",
+      "review_decision": "keep"
+    },
+    {
+      "id": "c003",
+      "type": "diagram",
+      "description": "A clean comparison closes the thesis.",
+      "script_section_id": "s3",
+      "start_seconds": 6,
+      "end_seconds": 9,
+      "layout_notes": "Centered deterministic diagram with two shapes; readable labels added in Remotion only.",
+      "t2i_prompt": "textless clean editorial layout, two contrasting geometric systems, centered, generous negative space",
+      "dialogue": "所以，竞争的不是节点，而是整张网。",
+      "voice_segment_ids": ["v3"],
+      "visual_ref": {"kind": "placeholder", "placeholder_reason": "Fixture proves placeholder gate without provider credentials."},
+      "sound_intent": {"se": [], "bgm_mood": "resolved", "silence": false},
+      "motion_route": "PROGRAMMATIC",
+      "review_decision": "keep"
+    }
+  ],
+  "metadata": {"presentation_contract": "seven-column-v1", "total_duration_seconds": 9}
+}

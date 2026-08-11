@@ -238,6 +238,11 @@ ARTIFACT_FILES = {
     "edit_decisions": "edit_decisions.json",
     "render_report": "render_report.json",
     "final_review": "final_review.json",
+    "report_intake": "report_intake.json",
+    "content_architecture": "content_architecture.json",
+    "voice_timing": "voice_timing.json",
+    "visual_development": "visual_development.json",
+    "final_gate": "final_gate.json",
     "publish_log": "publish_log.json",
     "decision_log": "decision_log.json",
 }
@@ -378,6 +383,26 @@ def _find_scene_snapshot(project_dir: Path, scene_id: str) -> Optional[dict]:
     return None
 
 
+def _scene_layout_visual(project_dir: Path, scene: dict) -> Optional[dict]:
+    """Resolve a seven-column layout reference without confusing it with a final asset."""
+    ref = scene.get("visual_ref")
+    if not isinstance(ref, dict):
+        return None
+    raw_path = ref.get("path") or ""
+    resolved = _resolve_asset_path(project_dir, raw_path) if raw_path else None
+    if resolved is not None:
+        try:
+            resolved.resolve().relative_to(Path(project_dir).resolve())
+        except (ValueError, OSError):
+            resolved = None
+    return {
+        "kind": ref.get("kind"),
+        "path": _rel(project_dir, resolved) if resolved is not None else raw_path,
+        "exists": resolved is not None,
+        "placeholder_reason": ref.get("placeholder_reason"),
+    }
+
+
 def _find_script_section(scene: dict, sections: list[dict]) -> Optional[dict]:
     """Join scene → script section by id, falling back to timing overlap."""
     sid = scene.get("script_section_id")
@@ -460,6 +485,7 @@ def _build_storyboard(
         )
         cards.append({
             "id": sid,
+            "script_section_id": scene.get("script_section_id"),
             "type": scene.get("type"),
             "description": scene.get("description"),
             "start_seconds": scene.get("start_seconds"),
@@ -474,9 +500,21 @@ def _build_storyboard(
             "shot_intent": scene.get("shot_intent"),
             "framing": scene.get("framing"),
             "movement": scene.get("movement"),
-            "narration": (section or {}).get("text"),
+            "layout_notes": scene.get("layout_notes"),
+            "t2i_prompt": scene.get("t2i_prompt"),
+            "dialogue": scene.get("dialogue"),
+            "voice_segment_ids": scene.get("voice_segment_ids") or [],
+            "sound_intent": scene.get("sound_intent"),
+            "reuse": scene.get("reuse"),
+            "motion_route": scene.get("motion_route"),
+            "image_provenance": scene.get("image_provenance"),
+            "review_decision": scene.get("review_decision") or "pending",
+            "review_notes": scene.get("review_notes"),
+            "merge_target_id": scene.get("merge_target_id"),
+            "narration": scene.get("dialogue") if scene.get("dialogue") is not None else (section or {}).get("text"),
             "section_label": (section or {}).get("label"),
             "required_assets": scene.get("required_assets") or [],
+            "layout_visual": _scene_layout_visual(project_dir, scene),
             "visual": active_visual,
             "takes": renderable,
             "audio": audio,
@@ -492,6 +530,7 @@ def _build_storyboard(
         "scenes": cards,
         "total_duration_seconds": total,
         "style_playbook": scene_plan.get("style_playbook"),
+        "presentation_contract": (scene_plan.get("metadata") or {}).get("presentation_contract"),
     }
 
 
