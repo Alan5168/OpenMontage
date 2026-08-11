@@ -69,3 +69,30 @@ def test_knowledge_short_uses_fixture_validated_sota_image_policy() -> None:
             "requires_fixture_validation": True,
         },
     ]
+
+
+def test_knowledge_short_uses_fixture_validated_asr_ranking() -> None:
+    resolved = resolve_scenario("comic_nonfiction_short_knowledge_zh")
+    policy = resolved["profile"]["asr_policy"]
+
+    assert policy == {
+        "selection_mode": "validated_primary_with_precision_backup",
+        "primary": {
+            "provider": "funasr",
+            "model": "iic/SenseVoiceSmall",
+            "device": "cuda",
+            "compute_type": "float32",
+            "role": "primary_clock",
+            "requires_fixture_validation": True,
+        },
+        "backup": {
+            "provider": "faster-whisper",
+            "model": "large-v3-turbo",
+            "device": "cpu",
+            "compute_type": "int8",
+            "role": "precision_backup",
+            "requires_fixture_validation": True,
+        },
+        "approved_script_is_lexical_truth": True,
+        "model_change_requires_revalidation": True,
+    }

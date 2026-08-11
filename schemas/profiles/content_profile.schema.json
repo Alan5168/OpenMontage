@@ -46,6 +46,18 @@
       "type": "string",
       "enum": ["RESEARCH_ONLY", "LICENSED_FOOTAGE_REQUIRED", "SOURCE_MEDIA_REQUIRED", "GENERATED_ORIGINAL_ONLY"]
     },
+    "asr_policy": {
+      "type": "object",
+      "required": ["selection_mode", "primary", "backup", "approved_script_is_lexical_truth", "model_change_requires_revalidation"],
+      "properties": {
+        "selection_mode": { "const": "validated_primary_with_precision_backup" },
+        "primary": { "$ref": "#/$defs/asrSelection" },
+        "backup": { "$ref": "#/$defs/asrSelection" },
+        "approved_script_is_lexical_truth": { "const": true },
+        "model_change_requires_revalidation": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
     "quality_thresholds": {
       "type": "object",
       "required": ["subtitle_safe_area_required", "black_frame_max_seconds", "freeze_frame_max_seconds"],
@@ -93,5 +105,20 @@
     },
     "metadata": { "type": "object" }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "asrSelection": {
+      "type": "object",
+      "required": ["provider", "model", "device", "compute_type", "role", "requires_fixture_validation"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "device": { "type": "string", "enum": ["cpu", "cuda"] },
+        "compute_type": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "enum": ["primary_clock", "precision_backup"] },
+        "requires_fixture_validation": { "const": true }
+      },
+      "additionalProperties": false
+    }
+  }
 }

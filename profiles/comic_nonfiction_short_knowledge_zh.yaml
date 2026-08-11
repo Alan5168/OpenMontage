@@ -7,6 +7,12 @@ language: zh-CN
 narration_mode: HUMAN_VO
 sceneplan_contract: seven-column-v1
 source_policy: GENERATED_ORIGINAL_ONLY
+asr_policy:
+  selection_mode: validated_primary_with_precision_backup
+  primary: {provider: funasr, model: iic/SenseVoiceSmall, device: cuda, compute_type: float32, role: primary_clock, requires_fixture_validation: true}
+  backup: {provider: faster-whisper, model: large-v3-turbo, device: cpu, compute_type: int8, role: precision_backup, requires_fixture_validation: true}
+  approved_script_is_lexical_truth: true
+  model_change_requires_revalidation: true
 quality_thresholds: {subtitle_safe_area_required: true, black_frame_max_seconds: 0.10, freeze_frame_max_seconds: 0.50, integrated_lufs_target: -16, true_peak_max_dbtp: -1.5, vo_bgm_min_db: 9}
 provider_policy:
   image_capability: image_generation

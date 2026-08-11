@@ -58,7 +58,7 @@ class Transcriber(BaseTool):
             "input_path": {"type": "string", "description": "Path to audio or video file"},
             "model_size": {
                 "type": "string",
-                "enum": ["tiny", "base", "small", "medium", "large-v2", "large-v3"],
+                "enum": ["tiny", "base", "small", "medium", "large-v2", "large-v3", "large-v3-turbo"],
                 "default": "base",
             },
             "language": {"type": "string", "description": "ISO 639-1 language code, or null for auto-detect"},

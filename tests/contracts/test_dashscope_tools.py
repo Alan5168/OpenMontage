@@ -231,11 +231,13 @@ class TestDashscopeImageSpecific:
         assert "*" in size_default
         assert "x" not in size_default.lower()
 
-    def test_cost_positive_for_image(self):
+    def test_cost_positive_for_image(self, monkeypatch):
+        monkeypatch.delenv("BAILIAN_TOKENPLAN_API_KEY", raising=False)
         tool = DashscopeImage()
         assert tool.estimate_cost({"prompt": "test", "n": 1}) > 0.0
 
-    def test_cost_scales_with_n(self):
+    def test_cost_scales_with_n(self, monkeypatch):
+        monkeypatch.delenv("BAILIAN_TOKENPLAN_API_KEY", raising=False)
         tool = DashscopeImage()
         cost1 = tool.estimate_cost({"prompt": "test", "n": 1})
         cost3 = tool.estimate_cost({"prompt": "test", "n": 3})
