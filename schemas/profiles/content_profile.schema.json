@@ -67,6 +67,25 @@
         "video_capability": { "const": "video_generation" },
         "static_image_via_video_provider_forbidden": { "const": true },
         "image_allowlist": { "type": "array", "items": { "type": "string" } },
+        "image_selection_mode": {
+          "type": "string",
+          "enum": ["provider_default", "validated_sota"]
+        },
+        "image_preferences": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["provider", "model", "role"],
+            "properties": {
+              "provider": { "type": "string", "minLength": 1 },
+              "model": { "type": "string", "minLength": 1 },
+              "role": { "type": "string", "enum": ["primary", "fallback"] },
+              "requires_fixture_validation": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "model_change_requires_revalidation": { "type": "boolean" },
         "video_allowlist": { "type": "array", "items": { "type": "string" } },
         "local_video_equipment": { "type": "array", "items": { "type": "string" } }
       },

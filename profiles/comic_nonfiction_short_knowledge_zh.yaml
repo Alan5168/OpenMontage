@@ -8,5 +8,16 @@ narration_mode: HUMAN_VO
 sceneplan_contract: seven-column-v1
 source_policy: GENERATED_ORIGINAL_ONLY
 quality_thresholds: {subtitle_safe_area_required: true, black_frame_max_seconds: 0.10, freeze_frame_max_seconds: 0.50, integrated_lufs_target: -16, true_peak_max_dbtp: -1.5, vo_bgm_min_db: 9}
-provider_policy: {image_capability: image_generation, video_capability: video_generation, static_image_via_video_provider_forbidden: true, image_allowlist: [volcengine], video_allowlist: [comfyui, video-gen-pool], local_video_equipment: [h3-comfyui, remotion]}
+provider_policy:
+  image_capability: image_generation
+  video_capability: video_generation
+  static_image_via_video_provider_forbidden: true
+  image_allowlist: [dashscope, volcengine]
+  image_selection_mode: validated_sota
+  image_preferences:
+    - {provider: dashscope, model: wan2.7-image-pro, role: primary, requires_fixture_validation: true}
+    - {provider: volcengine, model: doubao-seedream-5.0-lite, role: fallback, requires_fixture_validation: true}
+  model_change_requires_revalidation: true
+  video_allowlist: [comfyui, video-gen-pool]
+  local_video_equipment: [h3-comfyui, remotion]
 metadata: {thesis_count: 1, first_second_payoff_required: true}

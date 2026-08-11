@@ -46,3 +46,26 @@ def test_job_selection_is_frozen_and_cannot_switch(tmp_path: Path) -> None:
 
     with pytest.raises(ScenarioCatalogError, match="already frozen"):
         freeze_scenario_for_job(tmp_path, "comic_nonfiction_short_news_zh")
+
+
+def test_knowledge_short_uses_fixture_validated_sota_image_policy() -> None:
+    resolved = resolve_scenario("comic_nonfiction_short_knowledge_zh")
+    policy = resolved["profile"]["provider_policy"]
+
+    assert policy["image_selection_mode"] == "validated_sota"
+    assert policy["model_change_requires_revalidation"] is True
+    assert policy["image_allowlist"] == ["dashscope", "volcengine"]
+    assert policy["image_preferences"] == [
+        {
+            "provider": "dashscope",
+            "model": "wan2.7-image-pro",
+            "role": "primary",
+            "requires_fixture_validation": True,
+        },
+        {
+            "provider": "volcengine",
+            "model": "doubao-seedream-5.0-lite",
+            "role": "fallback",
+            "requires_fixture_validation": True,
+        },
+    ]
