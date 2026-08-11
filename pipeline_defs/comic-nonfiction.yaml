@@ -72,10 +72,10 @@ stages:
     skill: pipelines/comic-nonfiction/voice-timing-director
     required_artifacts_in: [script]
     produces: [voice_timing]
-    tools_available: [transcriber]
+    tools_available: [sensevoice_transcriber, transcriber]
     checkpoint_required: true
     human_approval_default: false
-    success_criteria: [Human recording or approved dialogue estimate is canonical, Clock hash and invalidation inputs recorded]
+    success_criteria: [Human recording or approved dialogue estimate is canonical, Approved script is text truth while ASR is clock truth, Clock hash and invalidation inputs recorded]
   - name: visual_development
     skill: pipelines/comic-nonfiction/visual-development-director
     required_artifacts_in: [content_architecture, script]
