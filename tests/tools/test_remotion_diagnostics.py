@@ -105,10 +105,55 @@ def test_high_level_render_forwards_timeout_to_remotion(tool, tmp_path, monkeypa
             "asset_manifest": {"assets": [{"id": "a1", "path": "/tmp/a1.mp4"}]},
             "output_path": str(tmp_path / "out.mp4"),
             "remotion_timeout_ms": 120000,
+            "remotion_browser_executable": str(tmp_path / "chrome.exe"),
         }
     )
 
     assert captured.get("remotion_timeout_ms") == 120000
+    assert captured.get("remotion_browser_executable") == str(tmp_path / "chrome.exe")
+
+
+def test_remotion_browser_executable_is_validated_and_passed(tool, tmp_path, monkeypatch):
+    seen = {}
+    browser = tmp_path / "chrome.exe"
+    browser.write_bytes(b"fixture")
+
+    def fake_run_command(cmd, *a, **k):
+        seen["cmd"] = cmd
+        return None
+
+    monkeypatch.setattr(tool, "run_command", fake_run_command)
+    tool._remotion_render(
+        {
+            "composition_data": {"cuts": []},
+            "output_path": str(tmp_path / "out.mp4"),
+            "remotion_browser_executable": str(browser),
+        }
+    )
+
+    assert f"--browser-executable={browser.resolve()}" in seen["cmd"]
+
+
+def test_missing_remotion_browser_executable_fails_before_render(tool, tmp_path, monkeypatch):
+    called = False
+
+    def fake_run_command(cmd, *a, **k):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(tool, "run_command", fake_run_command)
+    missing = tmp_path / "missing-chrome.exe"
+    result = tool._remotion_render(
+        {
+            "composition_data": {"cuts": []},
+            "output_path": str(tmp_path / "out.mp4"),
+            "remotion_browser_executable": str(missing),
+        }
+    )
+
+    assert result.success is False
+    assert "does not exist or is not a file" in result.error
+    assert called is False
 
 
 def test_no_timeout_flag_when_not_requested(tool, tmp_path, monkeypatch):

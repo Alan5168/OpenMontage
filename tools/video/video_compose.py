@@ -201,6 +201,15 @@ class VideoCompose(BaseTool):
                     "networks). The subprocess timeout is widened to match."
                 ),
             },
+            "remotion_browser_executable": {
+                "type": "string",
+                "description": (
+                    "Absolute path to a Chrome/Chromium executable for this render. "
+                    "Passed to Remotion as `--browser-executable=<path>` after the "
+                    "file is validated. Use this job-scoped option when Remotion's "
+                    "managed browser is unavailable or its download cache is corrupt."
+                ),
+            },
         },
     }
 
@@ -878,6 +887,23 @@ class VideoCompose(BaseTool):
         visit(value)
         return len(staged_by_source)
 
+    @staticmethod
+    def _append_remotion_browser_executable(
+        cmd: list[str], inputs: dict[str, Any]
+    ) -> str | None:
+        """Validate and append a job-scoped Remotion browser executable."""
+        requested = inputs.get("remotion_browser_executable")
+        if requested is None:
+            return None
+        browser = Path(str(requested)).expanduser().resolve()
+        if not browser.is_file():
+            raise ValueError(
+                "remotion_browser_executable does not exist or is not a file: "
+                f"{browser}"
+            )
+        cmd.append(f"--browser-executable={browser}")
+        return str(browser)
+
     def _render_via_atelier(
         self,
         inputs: dict[str, Any],
@@ -969,6 +995,10 @@ class VideoCompose(BaseTool):
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         cmd = ["npx", "remotion", "render", str(effective_entry), str(comp_id), str(output_path)]
+        try:
+            browser_executable = self._append_remotion_browser_executable(cmd, inputs)
+        except ValueError as e:
+            return ToolResult(success=False, error=str(e))
 
         props_path = bespoke.get("props_path")
         if props_path:
@@ -1042,6 +1072,7 @@ class VideoCompose(BaseTool):
             "effective_entry": str(effective_entry) if effective_entry != entry_path else None,
             "composition_id": comp_id,
             "output": str(output_path),
+            "browser_executable": browser_executable,
             "final_review": final_review,
             "final_review_status": final_review.get("status"),
         }
@@ -1591,6 +1622,10 @@ class VideoCompose(BaseTool):
             # would only take effect on a direct _remotion_render() call.
             if inputs.get("remotion_timeout_ms") is not None:
                 remotion_inputs["remotion_timeout_ms"] = inputs["remotion_timeout_ms"]
+            if inputs.get("remotion_browser_executable") is not None:
+                remotion_inputs["remotion_browser_executable"] = inputs[
+                    "remotion_browser_executable"
+                ]
             if inputs.get("public_dir") is not None:
                 remotion_inputs["public_dir"] = inputs["public_dir"]
             render_result = self._remotion_render(remotion_inputs)
@@ -1919,6 +1954,14 @@ class VideoCompose(BaseTool):
                     error="CinematicRenderer received cuts but none could be adapted into scenes.",
                 )
 
+        browser_args: list[str] = []
+        try:
+            browser_executable = self._append_remotion_browser_executable(
+                browser_args, inputs
+            )
+        except ValueError as e:
+            return ToolResult(success=False, error=str(e))
+
         requested_public_dir = inputs.get("public_dir")
         cleanup_public_dir = False
         public_dir: Path | None = None
@@ -1956,6 +1999,7 @@ class VideoCompose(BaseTool):
         ]
         if public_dir is not None:
             cmd.append(f"--public-dir={public_dir}")
+        cmd.extend(browser_args)
 
         # Apply media profile dimensions
         profile_name = inputs.get("profile")
@@ -2028,6 +2072,7 @@ class VideoCompose(BaseTool):
                 "output": str(output_path),
                 "profile": profile_name,
                 "staged_media_count": staged_count,
+                "browser_executable": browser_executable,
             },
             artifacts=[str(output_path)],
         )
