@@ -1,4 +1,4 @@
-"""DashScope (Alibaba Cloud Bailian) image generation via Qwen-Image models.
+"""Alibaba Model Studio image generation via standard or Token Plan auth.
 
 Uses the DashScope-native multimodal-generation endpoint (NOT OpenAI-compatible
 mode, which only supports /chat/completions and /embeddings). The response
@@ -28,7 +28,7 @@ from tools.base_tool import (
 
 class DashscopeImage(BaseTool):
     name = "dashscope_image"
-    version = "0.1.0"
+    version = "0.2.0"
     tier = ToolTier.GENERATE
     capability = "image_generation"
     provider = "dashscope"
@@ -39,8 +39,9 @@ class DashscopeImage(BaseTool):
 
     dependencies = []
     install_instructions = (
-        "Set DASHSCOPE_API_KEY to your Alibaba Cloud DashScope API key.\n"
-        "  Get one at https://dashscope.aliyun.com/"
+        "Set DASHSCOPE_API_KEY for standard Model Studio billing, or set "
+        "BAILIAN_TOKENPLAN_API_KEY for the Beijing Token Plan profile. "
+        "Optional Token Plan base override: BAILIAN_TOKENPLAN_BASE."
     )
     fallback = "grok_image"
     fallback_tools = ["grok_image", "openai_image", "flux_image", "recraft_image"]
@@ -70,8 +71,10 @@ class DashscopeImage(BaseTool):
                 "type": "string",
                 "enum": [
                     "qwen-image-2.0-pro",
+                    "qwen-image-3.0",
                     "qwen-image-max",
                     "wan2.7-image",
+                    "wan2.7-image-pro",
                     "z-image-turbo",
                 ],
                 "default": "qwen-image-2.0-pro",
@@ -128,24 +131,50 @@ class DashscopeImage(BaseTool):
         "https://dashscope.aliyuncs.com/api/v1/services/aigc/"
         "multimodal-generation/generation"
     )
+    TOKENPLAN_BASE = "https://token-plan.cn-beijing.maas.aliyuncs.com"
+    GENERATION_PATH = "/api/v1/services/aigc/multimodal-generation/generation"
+
+    @staticmethod
+    def _api_key() -> str | None:
+        return os.environ.get("BAILIAN_TOKENPLAN_API_KEY") or os.environ.get(
+            "DASHSCOPE_API_KEY"
+        )
+
+    @classmethod
+    def _endpoint(cls) -> str:
+        if os.environ.get("BAILIAN_TOKENPLAN_API_KEY"):
+            base = os.environ.get("BAILIAN_TOKENPLAN_BASE") or cls.TOKENPLAN_BASE
+            return f"{base.rstrip('/')}{cls.GENERATION_PATH}"
+        return cls.ENDPOINT
+
+    @staticmethod
+    def _provider_profile() -> str:
+        return (
+            "token_plan"
+            if os.environ.get("BAILIAN_TOKENPLAN_API_KEY")
+            else "standard"
+        )
 
     def get_status(self) -> ToolStatus:
-        if os.environ.get("DASHSCOPE_API_KEY"):
+        if self._api_key():
             return ToolStatus.AVAILABLE
         return ToolStatus.UNAVAILABLE
 
     def estimate_cost(self, inputs: dict[str, Any]) -> float:
         # Conservative per-image estimate; DashScope bills per image.
         # Check the DashScope console for actual pricing.
+        if os.environ.get("BAILIAN_TOKENPLAN_API_KEY"):
+            return 0.0
         n = int(inputs.get("n", 1))
         return n * 0.02
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        api_key = os.environ.get("DASHSCOPE_API_KEY")
+        api_key = self._api_key()
         if not api_key:
             return ToolResult(
                 success=False,
-                error="DASHSCOPE_API_KEY not set. " + self.install_instructions,
+                error="No Alibaba Model Studio image credential is set. "
+                + self.install_instructions,
             )
 
         import requests
@@ -154,7 +183,7 @@ class DashscopeImage(BaseTool):
         try:
             payload = self._build_payload(inputs)
             response = requests.post(
-                self.ENDPOINT,
+                self._endpoint(),
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
@@ -196,6 +225,7 @@ class DashscopeImage(BaseTool):
             success=True,
             data={
                 "provider": "dashscope",
+                "provider_profile": self._provider_profile(),
                 "model": payload["model"],
                 "prompt": inputs["prompt"],
                 "size": payload["parameters"]["size"],
@@ -268,6 +298,9 @@ class DashscopeImage(BaseTool):
 
     @staticmethod
     def _safe_error(exc: Exception) -> str:
-        return str(exc).replace(
-            os.environ.get("DASHSCOPE_API_KEY", ""), "[redacted]"
-        )
+        message = str(exc)
+        for variable in ("DASHSCOPE_API_KEY", "BAILIAN_TOKENPLAN_API_KEY"):
+            secret = os.environ.get(variable, "")
+            if secret:
+                message = message.replace(secret, "[redacted]")
+        return message

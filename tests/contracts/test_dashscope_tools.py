@@ -116,6 +116,7 @@ class TestContract:
 
     def test_status_unavailable_without_key(self, cls, monkeypatch):
         monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+        monkeypatch.delenv("BAILIAN_TOKENPLAN_API_KEY", raising=False)
         tool = cls()
         assert tool.get_status() == ToolStatus.UNAVAILABLE
 
@@ -194,6 +195,31 @@ class TestContract:
 
 class TestDashscopeImageSpecific:
 
+    def test_token_plan_profile_is_available_without_standard_key(self, monkeypatch):
+        monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+        monkeypatch.setenv("BAILIAN_TOKENPLAN_API_KEY", "token-plan-test-key")
+        tool = DashscopeImage()
+        assert tool.get_status() == ToolStatus.AVAILABLE
+        assert tool._provider_profile() == "token_plan"
+        assert tool._endpoint() == (
+            "https://token-plan.cn-beijing.maas.aliyuncs.com"
+            "/api/v1/services/aigc/multimodal-generation/generation"
+        )
+        assert tool.estimate_cost({"prompt": "test", "n": 1}) == 0.0
+
+    def test_token_plan_base_can_be_overridden(self, monkeypatch):
+        monkeypatch.setenv("BAILIAN_TOKENPLAN_API_KEY", "token-plan-test-key")
+        monkeypatch.setenv("BAILIAN_TOKENPLAN_BASE", "https://example.test/root/")
+        assert DashscopeImage._endpoint() == (
+            "https://example.test/root"
+            "/api/v1/services/aigc/multimodal-generation/generation"
+        )
+
+    def test_sota_models_are_declared(self):
+        models = DashscopeImage.input_schema["properties"]["model"]["enum"]
+        assert "qwen-image-3.0" in models
+        assert "wan2.7-image-pro" in models
+
     def test_default_model_is_qwen_image_2_pro(self):
         tool = DashscopeImage()
         assert tool.input_schema["properties"]["model"]["default"] == "qwen-image-2.0-pro"
@@ -246,6 +272,14 @@ class TestDashscopeImageSpecific:
             Exception("failed with key secret-key-12345")
         )
         assert "secret-key-12345" not in redacted
+        assert "[redacted]" in redacted
+
+    def test_safe_error_redacts_token_plan_key(self, monkeypatch):
+        monkeypatch.setenv("BAILIAN_TOKENPLAN_API_KEY", "token-plan-secret")
+        redacted = DashscopeImage._safe_error(
+            Exception("failed with key token-plan-secret")
+        )
+        assert "token-plan-secret" not in redacted
         assert "[redacted]" in redacted
 
 
