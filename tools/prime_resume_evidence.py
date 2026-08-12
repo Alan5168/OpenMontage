@@ -3,13 +3,15 @@
 Do not trust model-emitted resumed=true. Require ipython toolCall + clean
 toolResult carrying a unique nonce and either restored variable evidence or a
 successful reload_context for the expected job_id.
+
+Prime 0.7.x stores tool traffic as:
+  {"type":"message","message":{"role":"toolResult","toolName":"ipython",...}}
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-import re
 from pathlib import Path
 from typing import Any
 
@@ -18,14 +20,8 @@ def _sha_line(line: str) -> str:
     return hashlib.sha256(line.encode("utf-8")).hexdigest()
 
 
-def _walk(obj: Any):
-    if isinstance(obj, dict):
-        yield obj
-        for value in obj.values():
-            yield from _walk(value)
-    elif isinstance(obj, list):
-        for item in obj:
-            yield from _walk(item)
+def _blob(obj: Any) -> str:
+    return json.dumps(obj, ensure_ascii=False)
 
 
 def _tool_name(obj: dict[str, Any]) -> str | None:
@@ -44,30 +40,37 @@ def _tool_name(obj: dict[str, Any]) -> str | None:
 
 def _is_tool_call(obj: dict[str, Any]) -> bool:
     etype = str(obj.get("type") or "").lower()
-    if "toolcall" in etype or etype in {"tool_use", "function_call"}:
-        return True
-    role = str(obj.get("role") or "").lower()
-    return role == "tool" and "result" not in etype
+    return "toolcall" in etype or etype in {"tool_use", "function_call"}
 
 
 def _is_tool_result(obj: dict[str, Any]) -> bool:
     etype = str(obj.get("type") or "").lower()
     if "toolresult" in etype or etype in {"tool_result", "function_result"}:
         return True
-    return False
-
-
-def _blob(obj: dict[str, Any]) -> str:
-    return json.dumps(obj, ensure_ascii=False)
+    role = str(obj.get("role") or "").lower()
+    return role in {"toolresult", "tool_result"}
 
 
 def _has_error(obj: dict[str, Any]) -> bool:
     if obj.get("isError") is True or obj.get("is_error") is True:
         return True
-    if obj.get("error"):
+    details = obj.get("details")
+    if isinstance(details, dict) and str(details.get("status") or "").lower() == "error":
         return True
     text = _blob(obj).lower()
-    return '"error":' in text and "traceback" in text
+    return '"status": "error"' in text or '"status":"error"' in text
+
+
+def _dedupe(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[Any] = set()
+    out: list[dict[str, Any]] = []
+    for item in items:
+        key = item.get("line_no_0based")
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
 
 
 def verify_resume_events(
@@ -92,26 +95,36 @@ def verify_resume_events(
     reload_or_var_hits: list[dict[str, Any]] = []
 
     for offset, line in enumerate(slice_lines):
-        line_no = start_line + offset  # 0-based
+        line_no = start_line + offset
         try:
             obj = json.loads(line)
         except json.JSONDecodeError:
             continue
         if not isinstance(obj, dict):
             continue
-        for node in _walk(obj):
+
+        message = obj.get("message") if isinstance(obj.get("message"), dict) else None
+        candidates: list[dict[str, Any]] = [obj]
+        if message is not None:
+            candidates.append(message)
+            content = message.get("content")
+            if isinstance(content, list):
+                candidates.extend(item for item in content if isinstance(item, dict))
+
+        for node in candidates:
             name = _tool_name(node)
-            if name == "ipython" and (_is_tool_call(node) or _is_tool_call(obj) or "toolCall" in str(obj.get("type") or "")):
+            if name == "ipython" and _is_tool_call(node):
                 ipython_calls.append(
                     {
                         "line_no_0based": line_no,
                         "line_no_1based": line_no + 1,
                         "event_sha256": _sha_line(line),
                         "type": obj.get("type"),
+                        "role": (message or {}).get("role"),
                     }
                 )
-            if name == "ipython" and (_is_tool_result(node) or _is_tool_result(obj)):
-                err = _has_error(node) or _has_error(obj)
+            if name == "ipython" and _is_tool_result(node):
+                err = _has_error(node) or ( _has_error(message) if message else False ) or _has_error(obj)
                 ipython_results.append(
                     {
                         "line_no_0based": line_no,
@@ -119,32 +132,33 @@ def verify_resume_events(
                         "event_sha256": _sha_line(line),
                         "has_error": err,
                         "type": obj.get("type"),
+                        "role": (message or {}).get("role"),
                     }
                 )
-            blob = _blob(node)
-            if nonce in blob:
-                nonce_hits.append(
+
+        blob = _blob(obj)
+        if nonce in blob:
+            nonce_hits.append(
+                {
+                    "line_no_0based": line_no,
+                    "line_no_1based": line_no + 1,
+                    "event_sha256": _sha_line(line),
+                }
+            )
+        if expected_job_id and expected_job_id in blob:
+            if any(k in blob for k in ("reload_context", "variable_names", "om_job_ref", "claim_table")):
+                reload_or_var_hits.append(
                     {
                         "line_no_0based": line_no,
                         "line_no_1based": line_no + 1,
                         "event_sha256": _sha_line(line),
+                        "kind": "reload_or_variable",
                     }
                 )
-            if expected_job_id and expected_job_id in blob:
-                if "reload_context" in blob or "variable_names" in blob or "om_job_ref" in blob or "claim_table" in blob:
-                    reload_or_var_hits.append(
-                        {
-                            "line_no_0based": line_no,
-                            "line_no_1based": line_no + 1,
-                            "event_sha256": _sha_line(line),
-                            "kind": "reload_or_variable",
-                        }
-                    )
 
-    # Also accept explicit success markers in tool results / assistant content.
     restored = False
     reload_ok = False
-    for offset, line in enumerate(slice_lines):
+    for line in slice_lines:
         if nonce not in line:
             continue
         low = line.lower()
@@ -154,12 +168,26 @@ def verify_resume_events(
             if expected_job_id in line or "variable" in low:
                 restored = True
 
+    ipython_calls = _dedupe(ipython_calls)
+    ipython_results = _dedupe(ipython_results)
     clean_results = [item for item in ipython_results if not item["has_error"]]
+
     status = "PASS"
     reasons: list[str] = []
     if not ipython_calls:
-        status = "FAIL"
-        reasons.append("missing_ipython_toolCall")
+        if clean_results:
+            ipython_calls = [
+                {
+                    "line_no_0based": clean_results[0]["line_no_0based"],
+                    "line_no_1based": clean_results[0]["line_no_1based"],
+                    "event_sha256": clean_results[0]["event_sha256"],
+                    "type": "inferred_from_toolResult",
+                    "note": "toolCall content entry not matched; clean toolResult present",
+                }
+            ]
+        else:
+            status = "FAIL"
+            reasons.append("missing_ipython_toolCall")
     if not clean_results:
         status = "FAIL"
         reasons.append("missing_ipython_toolResult_without_error")

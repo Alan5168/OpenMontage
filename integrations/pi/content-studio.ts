@@ -174,14 +174,18 @@ export default function contentStudioExtension(pi: ExtensionAPI) {
       projectId: Type.Optional(Type.String()),
     }),
     async execute(_toolCallId, params, signal) {
-      const runner = `${REPO}\\integrations\\pi\\run_content_studio_resume_prime.mjs`;
-      const args = [runner];
+      const runner = `${REPO}\\tools\\run_content_studio_resume_prime.py`;
+      const py =
+        process.env.CONTENT_STUDIO_PYTHON ??
+        "C:\\ContentStudio\\runtime\\OpenMontage-test-venv\\Scripts\\python.exe";
+      const args = ["-X", "utf8", runner];
       if (params.projectId) {
         args.push("--project-id", params.projectId);
       }
       const env: Record<string, string> = {
         ...process.env,
         CONTENT_STUDIO_OM_REPO: REPO,
+        CONTENT_STUDIO_PYTHON: py,
         CONTENT_STUDIO_PRIME_KERNEL_PYTHON:
           process.env.CONTENT_STUDIO_PRIME_KERNEL_PYTHON ??
           "C:\\ContentStudio\\runtime\\Prime-kernel-venv\\Scripts\\python.exe",
@@ -192,7 +196,7 @@ export default function contentStudioExtension(pi: ExtensionAPI) {
         OM_PRIME_ADAPTER_ROOT: process.env.OM_PRIME_ADAPTER_ROOT ?? "C:\\ContentStudio",
         OPENMONTAGE_PROJECTS_DIR: process.env.OPENMONTAGE_PROJECTS_DIR ?? "C:\\ContentStudio\\jobs",
       };
-      const result = await pi.exec("node", args, { signal, timeout: 300_000, env });
+      const result = await pi.exec(py, args, { signal, timeout: 300_000, env });
       if (result.code !== 0) {
         throw new Error(`content_studio_resume_prime failed: ${result.stderr || result.stdout}`);
       }

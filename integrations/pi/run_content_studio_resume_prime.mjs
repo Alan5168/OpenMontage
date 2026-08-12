@@ -30,8 +30,8 @@ function run(cmd, args, opts = {}) {
     let stderr = "";
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error(`timeout running ${cmd}`));
-    }, opts.timeout || 300_000);
+      reject(new Error(`timeout running ${cmd} after ${opts.timeout || 300_000}ms`));
+    }, opts.timeout || 600_000);
     child.stdout.on("data", (d) => {
       stdout += d.toString();
     });
@@ -90,7 +90,19 @@ async function verifyEvidence(sessionFile, nonce, jobId, startLine) {
 }
 
 export async function runContentStudioResumePrime({ projectId } = {}) {
+  const progressPath =
+    process.env.CONTENT_STUDIO_RESUME_PROGRESS ||
+    "C:\\ContentStudio\\reports\\pi-persistent-prime-handoff-continuity-v1\\PI_EXTENSION_E2E_PROGRESS.jsonl";
+  const tick = (obj) => {
+    const line = `${JSON.stringify({ at: new Date().toISOString(), ...obj })}\n`;
+    process.stderr.write(line);
+    try {
+      writeFileSync(progressPath, line, { flag: "a", encoding: "utf8" });
+    } catch {}
+  };
+  tick({ phase: "start", projectId: projectId || null });
   const request = await gateway("prepare-resume", projectId);
+  tick({ phase: "prepare_done", session_file: request.session_file });
   const sessionFile = String(request.session_file || "");
   const sessionDir = String(request.session_dir || "");
   const agentDir = String(request.agent_dir || "");
@@ -101,18 +113,25 @@ export async function runContentStudioResumePrime({ projectId } = {}) {
   }
   const nonce = `resume-nonce-${randomBytes(8).toString("hex")}`;
   const startLine = countLines(sessionFile);
-  const jobId = String(request.project_id);
-  const prompt = [
-    "You are resuming a project-bound Content Studio Prime session.",
-    "Call the ipython tool exactly once with this code, then stop:",
+  const jobId = String(process.env.CONTENT_STUDIO_EVIDENCE_JOB_ID || request.project_id);
+  const adapterSrc = join(REPO, "integrations", "prime-om-adapter", "src");
+  const pyLines = [
     "import json, os, sys",
-    `os.environ['OM_PRIME_ADAPTER_ROOT']=r'C:\\ContentStudio'`,
-    `sys.path.insert(0, r'${join(REPO, "integrations", "prime-om-adapter", "src").replace(/\\/g, "\\\\")}')`,
-    `sys.path.insert(0, r'${REPO.replace(/\\/g, "\\\\")}')`,
+    "os.environ['OM_PRIME_ADAPTER_ROOT']=r'C:\\ContentStudio'",
+    `sys.path.insert(0, r'${adapterSrc}')`,
+    `sys.path.insert(0, r'${REPO}')`,
     "from om_prime_adapter import build_context_variables, reload_context",
     `ledger=build_context_variables(${JSON.stringify(jobId)})`,
     "reloaded=reload_context(ledger)",
-    `print(json.dumps({'nonce': ${JSON.stringify(nonce)}, 'job_id': ledger.get('job_id'), 'variable_names': sorted(ledger.get('variables', {})), 'reload_context': True, 'om_job_ref': (ledger.get('variables') or {}).get('om_job_ref')}, ensure_ascii=False))`,
+    "payload={'nonce': " +
+      JSON.stringify(nonce) +
+      ", 'job_id': ledger.get('job_id'), 'variable_names': sorted(ledger.get('variables', dict())), 'reload_context': True, 'om_job_ref': (ledger.get('variables') or dict()).get('om_job_ref')}",
+    "print(json.dumps(payload, ensure_ascii=False))",
+  ];
+  const prompt = [
+    "You are resuming a project-bound Content Studio Prime session.",
+    "Call the ipython tool exactly once with this code, then stop:",
+    ...pyLines,
     "Do not start assets, H3, or rendering.",
   ].join("\n");
 
@@ -124,7 +143,7 @@ export async function runContentStudioResumePrime({ projectId } = {}) {
     "--model",
     "qwen3.8-max",
     "--thinking",
-    "medium",
+    "low",
     "--cwd",
     REPO,
     "--skill",
@@ -151,11 +170,17 @@ export async function runContentStudioResumePrime({ projectId } = {}) {
   };
   if (agentDir) env.PRIME_AGENT_CODING_AGENT_DIR = agentDir;
 
-  const prime = await run("node", primeArgs, { env, timeout: 300_000 });
+  tick({ phase: "prime_spawn", thinking: "low", timeout_ms: 180000 });
+  console.error(JSON.stringify({ phase: "prepare_done", session_file: sessionFile, kernel_python: kernelPython }));
+  const prime = await run("node", primeArgs, { env, timeout: 180_000 });
+  tick({ phase: "prime_done", code: prime.code, stdout_len: prime.stdout.length, stderr_len: prime.stderr.length });
+  console.error(JSON.stringify({ phase: "prime_done", code: prime.code, stdout_len: prime.stdout.length, stderr_len: prime.stderr.length }));
   if (prime.code !== 0) {
     throw new Error(`Prime persistent resume failed: ${prime.stderr || prime.stdout}`);
   }
   const evidence = await verifyEvidence(sessionFile, nonce, jobId, startLine);
+  tick({ phase: "evidence_done", status: evidence.status, reason: evidence.reason });
+  console.error(JSON.stringify({ phase: "evidence_done", status: evidence.status, reason: evidence.reason }));
   if (evidence.status !== "PASS") {
     throw new Error(`Mechanical resume evidence failed: ${evidence.reason}`);
   }

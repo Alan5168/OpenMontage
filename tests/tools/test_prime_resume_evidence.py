@@ -23,23 +23,27 @@ def test_verify_resume_events_requires_ipython_nonce_and_job(tmp_path: Path):
         ),
         json.dumps(
             {
-                "type": "toolResult",
-                "name": "ipython",
-                "isError": False,
-                "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps(
-                            {
-                                "nonce": nonce,
-                                "job_id": job,
-                                "variable_names": ["om_job_ref", "claim_table"],
-                                "reload_context": True,
-                                "om_job_ref": {"project_id": job},
-                            }
-                        ),
-                    }
-                ],
+                "type": "message",
+                "message": {
+                    "role": "toolResult",
+                    "toolCallId": "call_1",
+                    "toolName": "ipython",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(
+                                {
+                                    "nonce": nonce,
+                                    "job_id": job,
+                                    "variable_names": ["om_job_ref", "claim_table"],
+                                    "reload_context": True,
+                                    "om_job_ref": {"project_id": job},
+                                }
+                            ),
+                        }
+                    ],
+                    "details": {"status": "ok"},
+                },
             }
         ),
     ]
