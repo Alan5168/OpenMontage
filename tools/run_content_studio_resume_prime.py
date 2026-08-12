@@ -122,9 +122,13 @@ def run_resume(project_id: str | None) -> dict:
     if not str(session_file).lower().endswith(".jsonl"):
         raise RuntimeError("prepare-resume did not return a full .jsonl session_file")
 
+    if os.environ.get("CONTENT_STUDIO_EVIDENCE_JOB_ID"):
+        raise RuntimeError(
+            "CONTENT_STUDIO_EVIDENCE_JOB_ID is forbidden; evidence job_id must equal request.project_id"
+        )
     nonce = f"resume-nonce-{uuid.uuid4().hex[:16]}"
     start_line = count_lines(session_file)
-    job_id = os.environ.get("CONTENT_STUDIO_EVIDENCE_JOB_ID") or str(request["project_id"])
+    job_id = str(request["project_id"])
     adapter_src = REPO / "integrations" / "prime-om-adapter" / "src"
     py_code = "\n".join(
         [

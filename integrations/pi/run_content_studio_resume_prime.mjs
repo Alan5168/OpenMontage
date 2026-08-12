@@ -111,9 +111,14 @@ export async function runContentStudioResumePrime({ projectId } = {}) {
   if (!sessionFile.toLowerCase().endsWith(".jsonl")) {
     throw new Error("prepare-resume did not return a full Prime .jsonl session_file");
   }
+  if (process.env.CONTENT_STUDIO_EVIDENCE_JOB_ID) {
+    throw new Error(
+      "CONTENT_STUDIO_EVIDENCE_JOB_ID is forbidden; evidence job_id must equal request.project_id",
+    );
+  }
   const nonce = `resume-nonce-${randomBytes(8).toString("hex")}`;
   const startLine = countLines(sessionFile);
-  const jobId = String(process.env.CONTENT_STUDIO_EVIDENCE_JOB_ID || request.project_id);
+  const jobId = String(request.project_id);
   const adapterSrc = join(REPO, "integrations", "prime-om-adapter", "src");
   const pyLines = [
     "import json, os, sys",

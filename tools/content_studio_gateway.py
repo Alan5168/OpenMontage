@@ -617,35 +617,64 @@ def record_prime_resume(
             "Mechanical JSONL evidence is required; model self-report resumed=true is insufficient"
         )
     try:
-        evidence = json.loads(evidence_json)
+        submitted = json.loads(evidence_json)
     except json.JSONDecodeError as exc:
         raise GatewayError("Invalid evidence JSON") from exc
-    if evidence.get("status") != "PASS" or not evidence.get("resumed"):
-        raise GatewayError(f"Resume evidence failed: {evidence.get('reason')}")
-    required_evidence = [
-        "ipython_tool_calls",
-        "clean_ipython_tool_results",
-        "nonce_events",
-        "evidence_line_range_1based",
-        "nonce",
-    ]
-    for key in required_evidence:
-        if not evidence.get(key):
-            raise GatewayError(f"Resume evidence missing {key}")
-    if not (evidence.get("restored_variable") or evidence.get("reload_context_ok") or evidence.get("reload_or_variable_events")):
-        raise GatewayError("Resume evidence missing restored variable or reload_context")
 
     try:
-        response = json.loads(prime_response.strip()) if prime_response.strip().startswith("{") else {}
-    except json.JSONDecodeError:
-        response = {}
-    # Model ack is optional decoration; mechanical evidence decides resumed.
-    if response and response.get("session_file") not in {None, request["session_file"]}:
-        raise GatewayError("Prime acknowledgement session_file mismatch")
+        acknowledgement = (
+            json.loads(prime_response.strip()) if prime_response.strip().startswith("{") else {}
+        )
+    except json.JSONDecodeError as exc:
+        raise GatewayError("Invalid Prime acknowledgement JSON") from exc
+
+    submitted_job = submitted.get("expected_job_id")
+    if submitted_job != request["project_id"]:
+        raise GatewayError(
+            f"evidence.expected_job_id mismatch: {submitted_job!r} != {request['project_id']!r}"
+        )
+
+    submitted_session = submitted.get("session_file")
+    if not submitted_session:
+        raise GatewayError("evidence.session_file required")
+    if Path(str(submitted_session)).resolve() != Path(str(request["session_file"])).resolve():
+        raise GatewayError("evidence.session_file != request.session_file")
+
+    submitted_nonce = submitted.get("nonce")
+    ack_nonce = acknowledgement.get("nonce")
+    if not submitted_nonce or submitted_nonce != ack_nonce:
+        raise GatewayError("evidence.nonce != acknowledgement.nonce")
+
+    if acknowledgement.get("session_file") not in {None, request["session_file"]}:
+        if Path(str(acknowledgement.get("session_file"))).resolve() != Path(
+            str(request["session_file"])
+        ).resolve():
+            raise GatewayError("Prime acknowledgement session_file mismatch")
+
+    start_line = submitted.get("start_line_0based")
+    if not isinstance(start_line, int) or start_line < 0:
+        raise GatewayError("evidence.start_line_0based required for re-verification")
+
+    # Never trust caller-submitted PASS; re-verify toolResult JSONL on disk.
+    evidence = verify_resume_events(
+        request["session_file"],
+        nonce=str(submitted_nonce),
+        expected_job_id=str(request["project_id"]),
+        start_line=start_line,
+    )
+    if evidence.get("status") != "PASS" or not evidence.get("resumed"):
+        raise GatewayError(f"Resume evidence re-verification failed: {evidence.get('reason')}")
+    if evidence.get("expected_job_id") != request["project_id"]:
+        raise GatewayError("Re-verified evidence.expected_job_id mismatch")
+    if Path(str(evidence.get("session_file"))).resolve() != Path(str(request["session_file"])).resolve():
+        raise GatewayError("Re-verified evidence.session_file mismatch")
+    if evidence.get("nonce") != acknowledgement.get("nonce"):
+        raise GatewayError("Re-verified evidence.nonce != acknowledgement.nonce")
 
     usage = summarize_session_usage(request["session_file"])
     call_sha = evidence["ipython_tool_calls"][0]["event_sha256"]
-    result_sha = evidence["clean_ipython_tool_results"][0]["event_sha256"]
+    result_events = evidence.get("accepted_tool_result_events") or evidence.get("clean_ipython_tool_results")
+    result_sha = result_events[0]["event_sha256"]
     receipt = {
         "schema_version": "om-prime-resume-receipt/v3",
         "status": "PASS",
@@ -666,11 +695,15 @@ def record_prime_resume(
         "fake_json_echo": False,
         "resumed_evidence": {
             "nonce": evidence["nonce"],
+            "expected_job_id": evidence["expected_job_id"],
+            "job_id": evidence.get("job_id"),
+            "variable_names": evidence.get("variable_names") or [],
             "evidence_line_range_1based": evidence["evidence_line_range_1based"],
             "ipython_tool_call_sha256": call_sha,
             "ipython_tool_result_sha256": result_sha,
             "restored_variable": bool(evidence.get("restored_variable")),
             "reload_context_ok": bool(evidence.get("reload_context_ok")),
+            "reverified_from_session_jsonl": True,
             "verifier": "tools.prime_resume_evidence.verify_resume_events",
         },
         "forbidden_flags_absent": True,

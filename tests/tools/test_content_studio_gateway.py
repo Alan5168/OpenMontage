@@ -270,35 +270,121 @@ def test_prime_resume_requires_project_pointer_and_mechanical_evidence(tmp_path:
                     "session_file": request["session_file"],
                     "resumed": True,
                     "fake_json_echo": False,
+                    "nonce": "nonce-fixture-001",
                 }
             ),
+        )
+
+    # Append mechanical toolCall + clean toolResult JSON to the bound session.
+    nonce = "nonce-fixture-001"
+    job = request["project_id"]
+    start_line = len(bound.read_text(encoding="utf-8").splitlines())
+    with bound.open("a", encoding="utf-8") as handle:
+        handle.write(
+            json.dumps(
+                {
+                    "type": "message",
+                    "message": {
+                        "role": "assistant",
+                        "content": [
+                            {"type": "toolCall", "name": "ipython", "arguments": {"code": "print(1)"}}
+                        ],
+                    },
+                }
+            )
+            + "\n"
+        )
+        handle.write(
+            json.dumps(
+                {
+                    "type": "message",
+                    "message": {
+                        "role": "toolResult",
+                        "toolCallId": "call_1",
+                        "toolName": "ipython",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": json.dumps(
+                                    {
+                                        "nonce": nonce,
+                                        "job_id": job,
+                                        "variable_names": ["om_job_ref", "claim_table"],
+                                        "reload_context": True,
+                                    }
+                                ),
+                            }
+                        ],
+                        "details": {"status": "ok"},
+                    },
+                }
+            )
+            + "\n"
         )
 
     evidence = {
         "status": "PASS",
         "resumed": True,
         "fake_json_echo": False,
-        "nonce": "nonce-fixture-001",
+        "nonce": nonce,
+        "expected_job_id": job,
+        "session_file": request["session_file"],
+        "start_line_0based": start_line,
+        # Deliberately wrong event hashes — record must re-verify from disk.
         "evidence_line_range_1based": [2, 4],
         "ipython_tool_calls": [{"event_sha256": "a" * 64, "line_no_1based": 2}],
         "clean_ipython_tool_results": [{"event_sha256": "b" * 64, "line_no_1based": 3}],
         "nonce_events": [{"event_sha256": "c" * 64, "line_no_1based": 4}],
         "restored_variable": True,
-        "reload_context_ok": False,
-        "reload_or_variable_events": [{"event_sha256": "d" * 64}],
+        "reload_context_ok": True,
     }
     receipt = record_prime_resume(
         projects,
         None,
         request["request_id"],
-        json.dumps({"status": "PRIME_OM_RESUME_ACCEPTED", "session_file": request["session_file"]}),
+        json.dumps(
+            {
+                "status": "PRIME_OM_RESUME_ACCEPTED",
+                "session_file": request["session_file"],
+                "nonce": nonce,
+            }
+        ),
         json.dumps(evidence),
     )
     assert receipt["schema_version"] == "om-prime-resume-receipt/v3"
     assert receipt["resumed"] is True
-    assert receipt["resumed_evidence"]["ipython_tool_call_sha256"] == "a" * 64
-    assert receipt["resumed_evidence"]["nonce"] == "nonce-fixture-001"
+    assert receipt["resumed_evidence"]["nonce"] == nonce
+    assert receipt["resumed_evidence"]["expected_job_id"] == job
+    assert receipt["resumed_evidence"]["reverified_from_session_jsonl"] is True
+    assert receipt["resumed_evidence"]["ipython_tool_call_sha256"] != "a" * 64
     assert receipt["global_latest_fallback"] is False
+
+    cross = dict(evidence)
+    cross["expected_job_id"] = "other-project"
+    with pytest.raises(GatewayError, match="evidence.expected_job_id mismatch"):
+        record_prime_resume(
+            projects,
+            None,
+            request["request_id"],
+            json.dumps({"status": "PRIME_OM_RESUME_ACCEPTED", "session_file": request["session_file"], "nonce": nonce}),
+            json.dumps(cross),
+        )
+
+    bad_nonce = dict(evidence)
+    with pytest.raises(GatewayError, match="evidence.nonce != acknowledgement.nonce"):
+        record_prime_resume(
+            projects,
+            None,
+            request["request_id"],
+            json.dumps(
+                {
+                    "status": "PRIME_OM_RESUME_ACCEPTED",
+                    "session_file": request["session_file"],
+                    "nonce": "different-nonce",
+                }
+            ),
+            json.dumps(bad_nonce),
+        )
 
 
 def test_prepare_resume_rejects_unrelated_latest_even_when_present(tmp_path: Path, monkeypatch):
