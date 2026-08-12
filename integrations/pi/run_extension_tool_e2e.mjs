@@ -72,14 +72,18 @@ function execLikePi(command, args, options = {}) {
 async function loadExtensionTools(extensionPath) {
   const requireFromPi = createRequire(join(PI_PKG, "package.json"));
   const { createJiti } = requireFromPi("jiti");
-  const piAi = requireFromPi.resolve("@earendil-works/pi-ai");
-  const piAgent = requireFromPi.resolve("@earendil-works/pi-coding-agent");
+  const piAiRoot = join(PI_PKG, "node_modules", "@earendil-works", "pi-ai");
+  const piAi = join(piAiRoot, "dist", "index.js");
+  const piAiCompat = join(piAiRoot, "dist", "compat.js");
+  const piAgent = join(PI_PKG, "dist", "index.js");
   const jiti = createJiti(import.meta.url, {
     interopDefault: true,
     alias: {
       "@earendil-works/pi-ai": piAi,
+      "@earendil-works/pi-ai/compat": piAiCompat,
       "@earendil-works/pi-coding-agent": piAgent,
       "@mariozechner/pi-ai": piAi,
+      "@mariozechner/pi-ai/compat": piAiCompat,
       "@mariozechner/pi-coding-agent": piAgent,
     },
   });
