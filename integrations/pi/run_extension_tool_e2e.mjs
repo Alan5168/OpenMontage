@@ -45,13 +45,23 @@ function execLikePi(command, args, options = {}) {
       env,
       cwd: options.cwd || REPO,
       windowsHide: true,
-      signal: options.signal,
+      shell: false,
+      // Match Pi execCommand: ignore stdin so nested Prime/node does not hang.
+      stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
     let stderr = "";
-    const timer = setTimeout(() => {
+    let killed = false;
+    const killProcess = () => {
+      if (killed) return;
+      killed = true;
       child.kill();
-    }, options.timeout || 300_000);
+    };
+    const timer = setTimeout(killProcess, options.timeout || 300_000);
+    if (options.signal) {
+      if (options.signal.aborted) killProcess();
+      else options.signal.addEventListener("abort", killProcess, { once: true });
+    }
     child.stdout.on("data", (d) => {
       stdout += d.toString();
     });
@@ -60,10 +70,12 @@ function execLikePi(command, args, options = {}) {
     });
     child.on("close", (code) => {
       clearTimeout(timer);
+      if (options.signal) options.signal.removeEventListener("abort", killProcess);
       resolve({ stdout, stderr, code: code ?? 1 });
     });
     child.on("error", (err) => {
       clearTimeout(timer);
+      if (options.signal) options.signal.removeEventListener("abort", killProcess);
       resolve({ stdout, stderr: String(err), code: 1 });
     });
   });
