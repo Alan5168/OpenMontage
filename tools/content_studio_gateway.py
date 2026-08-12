@@ -23,8 +23,9 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from lib.checkpoint import get_pipeline_stages, validate_checkpoint, write_checkpoint
-from tools.prime_session_path import SessionPathError, latest_session_jsonl, resolve_session_jsonl
+from tools.prime_session_path import SessionPathError, resolve_session_jsonl
 from tools.prime_usage_ledger import summarize_session_usage
+from tools.prime_resume_evidence import verify_resume_events
 from tools.sceneplan_continuity import evaluate_visual_continuity
 
 
@@ -39,6 +40,12 @@ DEFAULT_PRIME_AGENT_DIR = Path(
     os.environ.get(
         "CONTENT_STUDIO_PRIME_AGENT_DIR",
         r"C:\ContentStudio\runtime\prime-rlm-pilot\agent",
+    )
+)
+DEFAULT_PRIME_KERNEL_PYTHON = Path(
+    os.environ.get(
+        "CONTENT_STUDIO_PRIME_KERNEL_PYTHON",
+        r"C:\ContentStudio\runtime\Prime-kernel-venv\Scripts\python.exe",
     )
 )
 OM_PRIME_ADAPTER_SKILL = REPO_ROOT / "integrations" / "prime-om-adapter"
@@ -502,46 +509,42 @@ def apply_sceneplan_decisions(
 
 
 def _resolve_persistent_session(project_dir: Path) -> dict[str, Any]:
-    """Locate the full Prime .jsonl path for a real resume. Fail closed if absent."""
-    pointer_candidates = [
-        project_dir / "working" / "prime_rlm" / "SESSION_POINTER.json",
-        project_dir / "working" / "prime_rlm" / "SESSION_RECEIPT.json",
-    ]
-    for pointer_path in pointer_candidates:
-        if not pointer_path.is_file():
-            continue
-        pointer = _read_json(pointer_path)
-        session_file = pointer.get("session_file") or pointer.get("session_path")
-        session_dir_value = pointer.get("session_dir")
-        session_dir = Path(session_dir_value) if session_dir_value else DEFAULT_PRIME_SESSION_DIR
-        if session_file:
-            try:
-                resolved = resolve_session_jsonl(session_file, session_dir=session_dir)
-            except SessionPathError as exc:
-                raise GatewayError(str(exc)) from exc
-            return {
-                "session_file": str(resolved),
-                "session_dir": str(session_dir),
-                "session_id": pointer.get("session_id") or resolved.stem,
-                "session_sha256": _sha256_file(resolved),
-                "pointer_path": str(pointer_path),
-                "agent_dir": str(pointer.get("agent_dir") or DEFAULT_PRIME_AGENT_DIR),
-            }
-
-    latest = latest_session_jsonl(DEFAULT_PRIME_SESSION_DIR)
-    if latest is None:
+    """Locate the project-bound Prime .jsonl path. Never fall back to global latest."""
+    pointer_path = project_dir / "working" / "prime_rlm" / "SESSION_POINTER.json"
+    if not pointer_path.is_file():
         raise GatewayError(
-            "No persistent Prime .jsonl session found. Create a named Director session "
-            "and write working/prime_rlm/SESSION_POINTER.json before resume. "
-            "JSON-echo fake resume is forbidden."
+            "Project-bound working/prime_rlm/SESSION_POINTER.json is required. "
+            "Global latest-session fallback is forbidden. Create a Director session "
+            "for this project and write the pointer before resume."
         )
+    pointer = _read_json(pointer_path)
+    session_file = pointer.get("session_file") or pointer.get("session_path")
+    if not session_file:
+        raise GatewayError("SESSION_POINTER.json missing session_file")
+    project_id = pointer.get("project_id")
+    marker = _read_json(project_dir / "project.json")
+    expected_project_id = marker.get("project_id") or project_dir.name
+    if project_id and project_id != expected_project_id:
+        raise GatewayError(
+            f"SESSION_POINTER project_id mismatch: {project_id!r} != {expected_project_id!r}"
+        )
+    session_dir_value = pointer.get("session_dir")
+    session_dir = Path(session_dir_value) if session_dir_value else DEFAULT_PRIME_SESSION_DIR
+    try:
+        resolved = resolve_session_jsonl(session_file, session_dir=session_dir)
+    except SessionPathError as exc:
+        raise GatewayError(str(exc)) from exc
+    kernel = pointer.get("kernel_python") or str(DEFAULT_PRIME_KERNEL_PYTHON)
     return {
-        "session_file": str(latest.resolve()),
-        "session_dir": str(DEFAULT_PRIME_SESSION_DIR),
-        "session_id": latest.stem,
-        "session_sha256": _sha256_file(latest),
-        "pointer_path": None,
-        "agent_dir": str(DEFAULT_PRIME_AGENT_DIR),
+        "session_file": str(resolved),
+        "session_dir": str(session_dir),
+        "session_id": pointer.get("session_id") or resolved.stem,
+        "session_sha256": pointer.get("session_sha256") or _sha256_file(resolved),
+        "pointer_path": str(pointer_path),
+        "agent_dir": str(pointer.get("agent_dir") or DEFAULT_PRIME_AGENT_DIR),
+        "kernel_python": str(kernel),
+        "project_id": expected_project_id,
+        "checkpoint_sha256_at_bind": pointer.get("checkpoint_sha256"),
     }
 
 
@@ -579,8 +582,11 @@ def prepare_prime_resume(projects_dir: Path, project_id: str | None) -> dict[str
         "session_id": session["session_id"],
         "session_sha256": session["session_sha256"],
         "agent_dir": session["agent_dir"],
+        "kernel_python": session["kernel_python"],
+        "pointer_path": session["pointer_path"],
         "skill_path": str(OM_PRIME_ADAPTER_SKILL),
         "forbidden_flags": ["--no-session", "--no-tools"],
+        "global_latest_fallback": False,
         "instruction": (
             "Resume the existing Prime session from session_file. Prove IPython state "
             "revival or reload. Acknowledge the OM checkpoint. Do not start assets/render. "
@@ -598,6 +604,7 @@ def record_prime_resume(
     project_id: str | None,
     request_id: str,
     prime_response: str,
+    evidence_json: str | None = None,
 ) -> dict[str, Any]:
     project = resolve_project(projects_dir, project_id)
     project_dir = project["project_dir"]
@@ -605,25 +612,42 @@ def record_prime_resume(
     request = _read_json(request_path)
     if request.get("request_id") != request_id:
         raise GatewayError("Prime resume request_id mismatch")
+    if not evidence_json:
+        raise GatewayError(
+            "Mechanical JSONL evidence is required; model self-report resumed=true is insufficient"
+        )
     try:
-        response = json.loads(prime_response.strip())
+        evidence = json.loads(evidence_json)
     except json.JSONDecodeError as exc:
-        raise GatewayError("Prime did not return the required JSON acknowledgement") from exc
-    required_matches = {
-        "status": "PRIME_OM_RESUME_ACCEPTED",
-        "project_id": request["project_id"],
-        "checkpoint_sha256": request["checkpoint_sha256"],
-        "next_stage": request["next_stage"],
-        "session_file": request["session_file"],
-        "resumed": True,
-        "fake_json_echo": False,
-    }
-    for key, expected in required_matches.items():
-        if response.get(key) != expected:
-            raise GatewayError(f"Prime acknowledgement mismatch for {key}: expected {expected!r}")
+        raise GatewayError("Invalid evidence JSON") from exc
+    if evidence.get("status") != "PASS" or not evidence.get("resumed"):
+        raise GatewayError(f"Resume evidence failed: {evidence.get('reason')}")
+    required_evidence = [
+        "ipython_tool_calls",
+        "clean_ipython_tool_results",
+        "nonce_events",
+        "evidence_line_range_1based",
+        "nonce",
+    ]
+    for key in required_evidence:
+        if not evidence.get(key):
+            raise GatewayError(f"Resume evidence missing {key}")
+    if not (evidence.get("restored_variable") or evidence.get("reload_context_ok") or evidence.get("reload_or_variable_events")):
+        raise GatewayError("Resume evidence missing restored variable or reload_context")
+
+    try:
+        response = json.loads(prime_response.strip()) if prime_response.strip().startswith("{") else {}
+    except json.JSONDecodeError:
+        response = {}
+    # Model ack is optional decoration; mechanical evidence decides resumed.
+    if response and response.get("session_file") not in {None, request["session_file"]}:
+        raise GatewayError("Prime acknowledgement session_file mismatch")
+
     usage = summarize_session_usage(request["session_file"])
+    call_sha = evidence["ipython_tool_calls"][0]["event_sha256"]
+    result_sha = evidence["clean_ipython_tool_results"][0]["event_sha256"]
     receipt = {
-        "schema_version": "om-prime-resume-receipt/v2",
+        "schema_version": "om-prime-resume-receipt/v3",
         "status": "PASS",
         "request_id": request_id,
         "project_id": request["project_id"],
@@ -636,9 +660,21 @@ def record_prime_resume(
         "session_dir": request["session_dir"],
         "session_id": request["session_id"],
         "session_sha256": request["session_sha256"],
+        "kernel_python": request.get("kernel_python"),
+        "pointer_path": request.get("pointer_path"),
         "resumed": True,
         "fake_json_echo": False,
+        "resumed_evidence": {
+            "nonce": evidence["nonce"],
+            "evidence_line_range_1based": evidence["evidence_line_range_1based"],
+            "ipython_tool_call_sha256": call_sha,
+            "ipython_tool_result_sha256": result_sha,
+            "restored_variable": bool(evidence.get("restored_variable")),
+            "reload_context_ok": bool(evidence.get("reload_context_ok")),
+            "verifier": "tools.prime_resume_evidence.verify_resume_events",
+        },
         "forbidden_flags_absent": True,
+        "global_latest_fallback": False,
         "usage_ledger": {
             "parent_tokens": usage["parent_tokens"],
             "child_tokens": usage["child_tokens"],
@@ -692,6 +728,7 @@ def _parser() -> argparse.ArgumentParser:
     record_parser = sub.add_parser("record-resume")
     record_parser.add_argument("--request-id", required=True)
     record_parser.add_argument("--prime-response", required=True)
+    record_parser.add_argument("--evidence-json", required=True)
     sub.add_parser("status")
     return parser
 
@@ -719,6 +756,7 @@ def main() -> int:
                 args.project_id,
                 args.request_id,
                 args.prime_response,
+                args.evidence_json,
             )
         else:
             payload = status_payload(args.projects_dir, args.project_id)

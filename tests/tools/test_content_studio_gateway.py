@@ -189,13 +189,36 @@ def test_full_approval_archives_old_hash_and_survives_reload(tmp_path: Path):
     assert list((project_dir / "history").glob("checkpoint_scene_plan_*.json"))
 
 
-def test_prime_resume_request_and_receipt_are_bound_to_checkpoint(tmp_path: Path, monkeypatch):
+def test_prime_resume_requires_project_pointer_and_mechanical_evidence(tmp_path: Path, monkeypatch):
     projects, project_dir = _fixture_projects(tmp_path)
     sessions = tmp_path / "prime-sessions"
     sessions.mkdir()
-    session_file = sessions / "fixture-director.jsonl"
-    session_file.write_text(
-        json.dumps({"type": "session_info", "name": "fixture-director"}) + "\n"
+    # Unrelated newest session must NOT be used without a project pointer.
+    unrelated = sessions / "unrelated-latest.jsonl"
+    unrelated.write_text(json.dumps({"type": "session_info", "name": "unrelated"}) + "\n", encoding="utf-8")
+    monkeypatch.setattr("tools.content_studio_gateway.DEFAULT_PRIME_SESSION_DIR", sessions)
+    monkeypatch.setattr("tools.content_studio_gateway.DEFAULT_PRIME_AGENT_DIR", tmp_path / "prime-agent")
+    monkeypatch.setattr(
+        "tools.content_studio_gateway.DEFAULT_PRIME_KERNEL_PYTHON",
+        tmp_path / "Prime-kernel-venv" / "Scripts" / "python.exe",
+    )
+
+    gate = show_gate_payload(projects)
+    apply_sceneplan_decisions(
+        projects,
+        None,
+        gate["checkpoint"]["sha256"],
+        [
+            {"cut_id": "c01", "decision": "keep"},
+            {"cut_id": "c02", "decision": "omit", "note": "信息重复。"},
+        ],
+    )
+    with pytest.raises(GatewayError, match="SESSION_POINTER.json is required"):
+        prepare_prime_resume(projects, None)
+
+    bound = sessions / "pilot-bound.jsonl"
+    bound.write_text(
+        json.dumps({"type": "session_info", "name": "pilot-bound"}) + "\n"
         + json.dumps(
             {
                 "type": "message",
@@ -208,51 +231,32 @@ def test_prime_resume_request_and_receipt_are_bound_to_checkpoint(tmp_path: Path
         + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(
-        "tools.content_studio_gateway.DEFAULT_PRIME_SESSION_DIR",
-        sessions,
-    )
-    monkeypatch.setattr(
-        "tools.content_studio_gateway.DEFAULT_PRIME_AGENT_DIR",
-        tmp_path / "prime-agent",
-    )
-    gate = show_gate_payload(projects)
-    apply_sceneplan_decisions(
-        projects,
-        None,
-        gate["checkpoint"]["sha256"],
-        [
-            {"cut_id": "c01", "decision": "keep"},
-            {"cut_id": "c02", "decision": "omit", "note": "信息重复。"},
-        ],
+    pointer_dir = project_dir / "working" / "prime_rlm"
+    pointer_dir.mkdir(parents=True, exist_ok=True)
+    (pointer_dir / "SESSION_POINTER.json").write_text(
+        json.dumps(
+            {
+                "project_id": "fixture-sceneplan-gate",
+                "session_file": str(bound.resolve()),
+                "session_dir": str(sessions),
+                "session_id": bound.stem,
+                "session_sha256": _sha(bound),
+                "agent_dir": str(tmp_path / "prime-agent"),
+                "kernel_python": str(tmp_path / "Prime-kernel-venv" / "Scripts" / "python.exe"),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
     )
     request = prepare_prime_resume(projects, None)
-    assert request["schema_version"] == "om-prime-resume-request/v2"
-    assert request["session_file"].endswith(".jsonl")
-    assert "--no-session" in request["forbidden_flags"]
-    response = json.dumps(
-        {
-            "status": "PRIME_OM_RESUME_ACCEPTED",
-            "project_id": request["project_id"],
-            "checkpoint_sha256": request["checkpoint_sha256"],
-            "next_stage": request["next_stage"],
-            "session_file": request["session_file"],
-            "resumed": True,
-            "fake_json_echo": False,
-        }
-    )
-    receipt = record_prime_resume(projects, None, request["request_id"], response)
-    assert receipt["status"] == "PASS"
-    assert receipt["schema_version"] == "om-prime-resume-receipt/v2"
-    assert receipt["resumed"] is True
-    assert receipt["fake_json_echo"] is False
-    assert receipt["usage_ledger"]["aggregate_tokens"]["total"] == 14
-    assert receipt["provider"] == "bailian"
-    assert receipt["model"] == "qwen3.8-max"
-    assert receipt["production_started"] is False
-    assert status_payload(projects, None)["prime_resume_receipt"]["status"] == "PASS"
+    assert request["session_file"] == str(bound.resolve())
+    assert request["session_file"] != str(unrelated.resolve())
+    assert request["global_latest_fallback"] is False
+    assert request["kernel_python"].endswith("python.exe")
 
-    with pytest.raises(GatewayError, match="acknowledgement mismatch"):
+    with pytest.raises(GatewayError, match="Mechanical JSONL evidence"):
         record_prime_resume(
             projects,
             None,
@@ -263,9 +267,56 @@ def test_prime_resume_request_and_receipt_are_bound_to_checkpoint(tmp_path: Path
                     "project_id": request["project_id"],
                     "checkpoint_sha256": request["checkpoint_sha256"],
                     "next_stage": request["next_stage"],
+                    "session_file": request["session_file"],
+                    "resumed": True,
+                    "fake_json_echo": False,
                 }
             ),
         )
+
+    evidence = {
+        "status": "PASS",
+        "resumed": True,
+        "fake_json_echo": False,
+        "nonce": "nonce-fixture-001",
+        "evidence_line_range_1based": [2, 4],
+        "ipython_tool_calls": [{"event_sha256": "a" * 64, "line_no_1based": 2}],
+        "clean_ipython_tool_results": [{"event_sha256": "b" * 64, "line_no_1based": 3}],
+        "nonce_events": [{"event_sha256": "c" * 64, "line_no_1based": 4}],
+        "restored_variable": True,
+        "reload_context_ok": False,
+        "reload_or_variable_events": [{"event_sha256": "d" * 64}],
+    }
+    receipt = record_prime_resume(
+        projects,
+        None,
+        request["request_id"],
+        json.dumps({"status": "PRIME_OM_RESUME_ACCEPTED", "session_file": request["session_file"]}),
+        json.dumps(evidence),
+    )
+    assert receipt["schema_version"] == "om-prime-resume-receipt/v3"
+    assert receipt["resumed"] is True
+    assert receipt["resumed_evidence"]["ipython_tool_call_sha256"] == "a" * 64
+    assert receipt["resumed_evidence"]["nonce"] == "nonce-fixture-001"
+    assert receipt["global_latest_fallback"] is False
+
+
+def test_prepare_resume_rejects_unrelated_latest_even_when_present(tmp_path: Path, monkeypatch):
+    projects, project_dir = _fixture_projects(tmp_path)
+    sessions = tmp_path / "prime-sessions"
+    sessions.mkdir()
+    (sessions / "zzz-newest-unrelated.jsonl").write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr("tools.content_studio_gateway.DEFAULT_PRIME_SESSION_DIR", sessions)
+    gate = show_gate_payload(projects)
+    apply_sceneplan_decisions(
+        projects,
+        None,
+        gate["checkpoint"]["sha256"],
+        [{"cut_id": "c01", "decision": "keep"}, {"cut_id": "c02", "decision": "keep"}],
+    )
+    assert not (project_dir / "working" / "prime_rlm" / "SESSION_POINTER.json").exists()
+    with pytest.raises(GatewayError, match="Global latest-session fallback is forbidden"):
+        prepare_prime_resume(projects, None)
 
 
 def test_independent_t2i_mothers_cannot_be_approved(tmp_path: Path):

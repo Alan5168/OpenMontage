@@ -164,98 +164,45 @@ export default function contentStudioExtension(pi: ExtensionAPI) {
     name: "content_studio_resume_prime",
     label: "Resume Persistent Prime From OM Checkpoint",
     description:
-      "After a Windows Pi Sceneplan approval, resume the real persistent Prime .jsonl session bound to the OM checkpoint, prove IPython revival, and record a receipt. Never uses --no-session/--no-tools fake JSON echo. Does not start assets or rendering.",
+      "After a Windows Pi Sceneplan approval, resume the project-bound persistent Prime .jsonl session, mechanically verify IPython revival from JSONL events, and record a receipt. Never uses --no-session/--no-tools fake JSON echo. Does not start assets or rendering.",
     promptSnippet: "Resume the persistent Prime session for the approved OM checkpoint and record a receipt",
     promptGuidelines: [
-      "Use content_studio_resume_prime only when the Sceneplan Gate is fully approved; it must remain bound to the OM checkpoint hash and a full session .jsonl path.",
-      "If prepare-resume fails because no session exists, tell Alan a Director session must be created first; do not invent a JSON-only acknowledgement.",
+      "Use content_studio_resume_prime only when the Sceneplan Gate is fully approved; it must remain bound to the OM checkpoint hash and a project-level SESSION_POINTER.json.",
+      "If prepare-resume fails because no project pointer exists, tell Alan a Director session must be created for this project first; do not invent a JSON-only acknowledgement.",
     ],
     parameters: Type.Object({
       projectId: Type.Optional(Type.String()),
     }),
     async execute(_toolCallId, params, signal) {
-      const request = await runGateway("prepare-resume", params.projectId, [], signal);
-      const sessionFile = String(request.session_file || "");
-      const sessionDir = String(request.session_dir || "");
-      const agentDir = String(request.agent_dir || "");
-      const skillPath = String(request.skill_path || `${REPO}\\integrations\\prime-om-adapter`);
-      if (!sessionFile.toLowerCase().endsWith(".jsonl")) {
-        throw new Error("prepare-resume did not return a full Prime .jsonl session_file");
+      const runner = `${REPO}\\integrations\\pi\\run_content_studio_resume_prime.mjs`;
+      const args = [runner];
+      if (params.projectId) {
+        args.push("--project-id", params.projectId);
       }
-      const expectedAcknowledgement = {
-        status: "PRIME_OM_RESUME_ACCEPTED",
-        project_id: request.project_id,
-        checkpoint_sha256: request.checkpoint_sha256,
-        next_stage: request.next_stage,
-        session_file: request.session_file,
-        resumed: true,
-        fake_json_echo: false,
-      };
-      const prompt = [
-        "You are resuming a persistent Content Studio Prime session.",
-        "Call the ipython tool exactly once to prove session revival (print any restored names or reload via om_prime_adapter), then reply with ONLY this JSON object and no markdown:",
-        JSON.stringify(expectedAcknowledgement),
-        "Do not start assets, H3, or rendering.",
-      ].join("\n");
-      const primeArgs = [
-        PRIME_CLI_JS,
-        "-p",
-        "--provider",
-        "bailian",
-        "--model",
-        "qwen3.8-max",
-        "--thinking",
-        "medium",
-        "--cwd",
-        REPO,
-        "--skill",
-        skillPath,
-        "--no-extensions",
-        "--no-prompt-templates",
-        "--no-context-files",
-        "--session-dir",
-        sessionDir,
-        "--resume",
-        sessionFile,
-        "--",
-        prompt,
-      ];
-      const primeEnv: Record<string, string> = {
+      const env: Record<string, string> = {
         ...process.env,
+        CONTENT_STUDIO_OM_REPO: REPO,
+        CONTENT_STUDIO_PRIME_KERNEL_PYTHON:
+          process.env.CONTENT_STUDIO_PRIME_KERNEL_PYTHON ??
+          "C:\\ContentStudio\\runtime\\Prime-kernel-venv\\Scripts\\python.exe",
+        PRIME_AGENT_KERNEL_PYTHON:
+          process.env.PRIME_AGENT_KERNEL_PYTHON ??
+          process.env.CONTENT_STUDIO_PRIME_KERNEL_PYTHON ??
+          "C:\\ContentStudio\\runtime\\Prime-kernel-venv\\Scripts\\python.exe",
         OM_PRIME_ADAPTER_ROOT: process.env.OM_PRIME_ADAPTER_ROOT ?? "C:\\ContentStudio",
         OPENMONTAGE_PROJECTS_DIR: process.env.OPENMONTAGE_PROJECTS_DIR ?? "C:\\ContentStudio\\jobs",
       };
-      if (agentDir) {
-        primeEnv.PRIME_AGENT_CODING_AGENT_DIR = agentDir;
+      const result = await pi.exec("node", args, { signal, timeout: 300_000, env });
+      if (result.code !== 0) {
+        throw new Error(`content_studio_resume_prime failed: ${result.stderr || result.stdout}`);
       }
-      const prime = await pi.exec("node", primeArgs, {
-        signal,
-        timeout: 300_000,
-        env: primeEnv,
-      });
-      if (prime.code !== 0) {
-        throw new Error(`Prime persistent resume failed: ${prime.stderr || prime.stdout}`);
+      const output = result.stdout.trim();
+      const jsonStart = output.lastIndexOf("{");
+      const payload = JSON.parse(jsonStart >= 0 ? output.slice(jsonStart) : output) as GatewayResult;
+      if (payload.status === "FAIL" || payload.status === "ERROR") {
+        throw new Error(String(payload.error || "content_studio_resume_prime failed"));
       }
-      const response = prime.stdout.trim();
-      const jsonStart = response.lastIndexOf("{");
-      const jsonText = jsonStart >= 0 ? response.slice(jsonStart) : response;
-      try {
-        JSON.parse(jsonText);
-      } catch {
-        throw new Error("Prime did not return the required strict JSON acknowledgement after persistent resume");
-      }
-      const receipt = await runGateway(
-        "record-resume",
-        params.projectId,
-        [
-          "--request-id",
-          String(request.request_id),
-          "--prime-response",
-          jsonText,
-        ],
-        signal,
-      );
-      return textResult(receipt);
+      return textResult(payload);
     },
   });
 
