@@ -191,7 +191,30 @@
       },
       "minItems": 1
     },
-    "metadata": { "type": "object" }
+    "metadata": { "type": "object" },
+    "visual_continuity_package": {
+      "type": "object",
+      "description": "Hard-gate package for multi-mother visual continuity before assets",
+      "required": ["generation_mode", "world_lock", "hero_prop_id", "camera_language"],
+      "properties": {
+        "generation_mode": {
+          "type": "string",
+          "enum": ["one_mother_edit", "multi_panel_one_request", "vector_primary"]
+        },
+        "world_lock": {
+          "type": "object",
+          "description": "Shared palette/material/hero props across mother frames",
+          "minProperties": 1
+        },
+        "hero_prop_id": { "type": "string", "minLength": 1 },
+        "camera_language": { "type": "string", "minLength": 1 },
+        "alan_continuous_animation_ok": {
+          "type": ["boolean", "null"],
+          "description": "Human continuous-animation acceptance; default null until Alan reviews"
+        }
+      },
+      "additionalProperties": true
+    }
   },
   "additionalProperties": false
 }
