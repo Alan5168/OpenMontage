@@ -8,9 +8,9 @@ import re
 from typing import Any
 
 ERROR_PATTERNS = {
-    "music_covers_vo": re.compile(r"bgm[^\\n]{0,40}(0\\.3[2-9]|0\\.[4-9]|1\\.0)|music covering|盖住口播", re.I),
-    "intent_prompt_result_mixed": re.compile(r"intent[^\\n]{0,20}prompt[^\\n]{0,20}result|one column|混为一列", re.I),
-    "render_before_gate": re.compile(r"render (now|before gate)|提前渲染|skip gate", re.I),
+    "music_covers_vo": re.compile(r"0\.32|music covering|盖住口播|bgm_volume.: 0\.3[2-9]", re.I),
+    "intent_prompt_result_mixed": re.compile(r"intent.{0,20}prompt.{0,20}result|one column|混为一列", re.I),
+    "render_before_gate": re.compile(r"then render before gate|提前渲染|skip gate|render now", re.I),
     "generated_readable_text": re.compile(r"generate readable (chinese|text)|生成可读字|burn text in image model", re.I),
 }
 

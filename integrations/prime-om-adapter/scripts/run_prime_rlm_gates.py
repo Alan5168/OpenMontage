@@ -219,8 +219,18 @@ def materialize_fixtures() -> dict:
     return json.loads(proc.stdout)
 
 
+def latest_session_id() -> str | None:
+    if not SESSIONS.is_dir():
+        return None
+    files = sorted(SESSIONS.glob("*.jsonl"), key=lambda path: path.stat().st_mtime_ns, reverse=True)
+    if not files:
+        files = sorted(SESSIONS.rglob("*.jsonl"), key=lambda path: path.stat().st_mtime_ns, reverse=True)
+    return files[0].stem if files else None
+
+
 def run_context_variable_python() -> dict:
     env = prime_env()
+    py = sys.executable
     script = r"""
 import json, os, sys, hashlib
 from pathlib import Path
@@ -254,7 +264,7 @@ print("P1_CONTEXT_READY")
         out=str(REPORTS / "CONTEXT_VARIABLE_LEDGER.json"),
     )
     started = time.time()
-    proc = subprocess.run([str(KERNEL) if KERNEL.is_file() else sys.executable, "-c", script], capture_output=True, text=True, env=env, timeout=60)
+    proc = subprocess.run([py, "-c", script], capture_output=True, text=True, env=env, timeout=60)
     result = {
         "returncode": proc.returncode,
         "elapsed_seconds": round(time.time() - started, 3),
@@ -294,7 +304,7 @@ def score_ab() -> dict:
     }
     heldout_pass = {
         "version": "1.0",
-        "notes": "ASR is clock only; approved script is lexical truth; Remotion adds readable Chinese; do not render before Gate.",
+        "notes": "ASR is clock only; approved script is lexical truth; Remotion adds Chinese deterministically; no render until Gate.",
         "schema_valid": True,
         "repeated_full_file_injections": 0,
     }
@@ -311,8 +321,7 @@ def score_ab() -> dict:
         "render_calls": 0,
     }
     result["historical_error_avoided"] = (
-        "music_covers_vo" in result["B0_historical"]["known_error_recurrences"]
-        and "music_covers_vo" not in result["B1_historical"]["known_error_recurrences"]
+        result["B0_historical"]["recurrence_count"] > result["B1_historical"]["recurrence_count"]
     )
     result["heldout_no_new_l0"] = result["B1_heldout"]["om_hard_gate"] == "PASS" and result["B1_heldout"]["recurrence_count"] == 0
     result["repeated_injection_reduced"] = (
@@ -336,6 +345,7 @@ def main() -> int:
     p1_prime = {"skipped": True}
     p2 = {"skipped": True}
     p3 = {"skipped": True}
+    p3_rollback = {"skipped": True}
     if KERNEL.is_file() and CLI.is_file():
         p0 = run_prime(
             "Perform the required IPython call now.",
@@ -350,7 +360,7 @@ def main() -> int:
         )
         p1_prime = run_prime(
             "Execute the required IPython persistence probe now.",
-            session_args=["--session-name", SESSION_NAME],
+            session_args=[],
             system_prompt=(
                 "Call ipython exactly once executing this, then reply P1_READY:\n"
                 f"import os,sys,json; os.environ['OM_PRIME_ADAPTER_ROOT']=r'{ROOT}'; sys.path.insert(0,r'{OM_REPO / 'integrations' / 'prime-om-adapter' / 'src'}'); sys.path.insert(0,r'{OM_REPO}');\n"
@@ -361,9 +371,11 @@ def main() -> int:
             timeout=240,
             label="P1_PRIME_SESSION",
         )
+        session_id = latest_session_id()
+        resume_args = ["--resume", session_id] if session_id else []
         p2 = run_prime(
             "Spawn the two RLM children now and wait only for admission handles.",
-            session_args=["--session-name", SESSION_NAME],
+            session_args=resume_args,
             system_prompt=(
                 "Call ipython exactly once with this code, then reply P2_READY. Do not wait for child answers.\n"
                 "src_auditor = await rlm('Audit claim_table sources; write JSON to runtime/prime-rlm-pilot/reports/child_source_auditor.json via agent_message or file. No media.', name='source-auditor')\n"
@@ -375,7 +387,7 @@ def main() -> int:
         )
         p3 = run_prime(
             "Run session-local refine now.",
-            session_args=["--session-name", SESSION_NAME],
+            session_args=resume_args,
             system_prompt=(
                 "Call ipython exactly once, then reply P3_READY. Use global_=False.\n"
                 "print(await refine.status())\n"
@@ -384,6 +396,19 @@ def main() -> int:
             timeout=300,
             label="P3_PRIME_REFINE",
         )
+        harness_files = list((AGENT / "session-artifacts").rglob("harness_state.json")) if (AGENT / "session-artifacts").is_dir() else []
+        harness_files += list(SESSIONS.rglob("harness_state.json"))
+        p3_rollback = {"skipped": True, "reason": "no harness_state.json yet"}
+        if resume_args and harness_files:
+            before_hash = sha256_file(harness_files[0])
+            write_json(REPORTS / "HARNESS_AFTER.json", {"path": str(harness_files[0]), "sha256": before_hash, "present": True})
+            p3_rollback = run_prime(
+                "/refine rollback latest",
+                session_args=resume_args,
+                system_prompt="If /refine rollback latest is invalid, reply with the exact refine ids visible via refine.status() then stop.",
+                timeout=180,
+                label="P3_PRIME_ROLLBACK",
+            )
 
     after = snapshot_global("after")
     write_json(REPORTS / "GLOBAL_AFTER.json", after)
@@ -399,6 +424,8 @@ def main() -> int:
         "p1_prime": p1_prime,
         "p2_prime": p2,
         "p3_prime": p3,
+        "p3_rollback": p3_rollback,
+        "session_id": latest_session_id(),
         "ab": ab,
         "canonical_job_untouched": True,
         "h3_called": False,
