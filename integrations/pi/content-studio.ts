@@ -1,6 +1,7 @@
 import { StringEnum, Type } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
+import { parseGatewayStdout } from "./parse_gateway_json.mjs";
 
 const REPO = process.env.CONTENT_STUDIO_OM_REPO ?? "C:\\ContentStudio\\repos\\OpenMontage";
 const GATEWAY = `${REPO}\\tools\\content_studio_gateway.py`;
@@ -79,7 +80,7 @@ export default function contentStudioExtension(pi: ExtensionAPI) {
     const output = result.stdout.trim();
     let payload: GatewayResult;
     try {
-      payload = JSON.parse(output) as GatewayResult;
+      payload = parseGatewayStdout(output) as GatewayResult;
     } catch {
       throw new Error(`Content Studio gateway returned invalid JSON: ${result.stderr || output}`);
     }
@@ -201,8 +202,14 @@ export default function contentStudioExtension(pi: ExtensionAPI) {
         throw new Error(`content_studio_resume_prime failed: ${result.stderr || result.stdout}`);
       }
       const output = result.stdout.trim();
-      const jsonStart = output.lastIndexOf("{");
-      const payload = JSON.parse(jsonStart >= 0 ? output.slice(jsonStart) : output) as GatewayResult;
+      let payload: GatewayResult;
+      try {
+        payload = parseGatewayStdout(output) as GatewayResult;
+      } catch (err) {
+        throw new Error(
+          `content_studio_resume_prime JSON parse failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
       if (payload.status === "FAIL" || payload.status === "ERROR") {
         throw new Error(String(payload.error || "content_studio_resume_prime failed"));
       }

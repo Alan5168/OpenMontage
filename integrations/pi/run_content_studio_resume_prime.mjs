@@ -8,6 +8,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseGatewayStdout } from "./parse_gateway_json.mjs";
 
 const REPO = process.env.CONTENT_STUDIO_OM_REPO ?? "C:\\ContentStudio\\repos\\OpenMontage";
 const GATEWAY = join(REPO, "tools", "content_studio_gateway.py");
@@ -50,10 +51,7 @@ function run(cmd, args, opts = {}) {
 }
 
 function parseJsonLine(text) {
-  const trimmed = text.trim();
-  const start = trimmed.lastIndexOf("{");
-  const payload = start >= 0 ? trimmed.slice(start) : trimmed;
-  return JSON.parse(payload);
+  return parseGatewayStdout(text);
 }
 
 async function gateway(command, projectId, extra = []) {
