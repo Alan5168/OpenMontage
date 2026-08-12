@@ -45,4 +45,11 @@ def test_latest_session_jsonl_prefers_newest(tmp_path: Path):
     newer = sessions / "b.jsonl"
     older.write_text("1\n", encoding="utf-8")
     newer.write_text("2\n", encoding="utf-8")
+    # Windows mtime granularity can collapse back-to-back writes; force order.
+    import os
+    import time
+
+    now = time.time()
+    os.utime(older, (now - 10, now - 10))
+    os.utime(newer, (now, now))
     assert latest_session_jsonl(sessions) == newer
