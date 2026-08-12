@@ -1,0 +1,14 @@
+{
+  "case_id": "PH7-D2-vo-bgm-rejected",
+  "scenario_id": "comic-nonfiction-short-knowledge-zh",
+  "status": "rejected",
+  "error_class": "music_covers_vo",
+  "summary": "Music covering voice-over; old poster-only gate missed the finished video.",
+  "repair": null,
+  "evidence_paths": [
+    "reports/windows-content-studio-shared-harness-v1/evidence/PH7-D2/audio_l0_bad_final.json"
+  ],
+  "tags": ["audio", "bgm", "false-pass"],
+  "before": {"vo_bgm_diff_db": 7.9, "lufs": -27.4, "gate": "false_pass"},
+  "after": null
+}

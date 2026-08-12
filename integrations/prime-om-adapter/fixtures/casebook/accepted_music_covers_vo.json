@@ -1,0 +1,14 @@
+{
+  "case_id": "PH7-D2-vo-bgm-accepted",
+  "scenario_id": "comic-nonfiction-short-knowledge-zh",
+  "status": "accepted",
+  "error_class": "music_covers_vo",
+  "summary": "BGM 0.26 + two-pass loudnorm keeps vo_bgm_diff at 9.7dB without rerendering video.",
+  "repair": "audio-only remux; never touch burned captions or video elementary stream",
+  "evidence_paths": [
+    "reports/windows-content-studio-shared-harness-v1/evidence/PH7-D2/REVIEW_PACK.md"
+  ],
+  "tags": ["audio", "bgm", "vo", "loudnorm"],
+  "before": {"vo_bgm_diff_db": 7.9, "bgm_volume": 0.32, "gate": "FAIL"},
+  "after": {"vo_bgm_diff_db": 9.7, "bgm_volume": 0.26, "gate": "PASS"}
+}

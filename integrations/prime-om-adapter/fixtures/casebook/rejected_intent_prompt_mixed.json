@@ -1,0 +1,12 @@
+{
+  "case_id": "sceneplan-intent-prompt-result-mixed",
+  "scenario_id": "comic-nonfiction-short-knowledge-zh",
+  "status": "rejected",
+  "error_class": "intent_prompt_result_mixed",
+  "summary": "Sceneplan collapsed visual intent, exact API prompt and generated result into one column.",
+  "repair": "Keep eight-column contract: result / intent / prompt stay independent.",
+  "evidence_paths": [
+    "reports/windows-openmontage-localized-content-studio-v1/SCENEPLAN_8COL_CONTRACT.md"
+  ],
+  "tags": ["sceneplan", "eight-column"]
+}

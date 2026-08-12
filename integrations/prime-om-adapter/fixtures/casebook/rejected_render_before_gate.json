@@ -1,0 +1,12 @@
+{
+  "case_id": "render-before-gate",
+  "scenario_id": "comic-nonfiction-short-knowledge-zh",
+  "status": "rejected",
+  "error_class": "render_before_gate",
+  "summary": "Render started before Windows Pi Sceneplan Gate.",
+  "repair": "Canonical checkpoint stays awaiting_human until Pi writes decisions.",
+  "evidence_paths": [
+    "reports/windows-openmontage-localized-content-studio-v1/PASS_ALAN_WINDOWS_ENTRY_REPORT.json"
+  ],
+  "tags": ["gate", "render"]
+}
