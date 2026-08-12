@@ -23,9 +23,25 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from lib.checkpoint import get_pipeline_stages, validate_checkpoint, write_checkpoint
+from tools.prime_session_path import SessionPathError, latest_session_jsonl, resolve_session_jsonl
+from tools.prime_usage_ledger import summarize_session_usage
+from tools.sceneplan_continuity import evaluate_visual_continuity
 
 
 GATE_DECISIONS = {"keep", "change", "merge", "omit"}
+DEFAULT_PRIME_SESSION_DIR = Path(
+    os.environ.get(
+        "CONTENT_STUDIO_PRIME_SESSION_DIR",
+        r"C:\ContentStudio\runtime\prime-rlm-pilot\sessions",
+    )
+)
+DEFAULT_PRIME_AGENT_DIR = Path(
+    os.environ.get(
+        "CONTENT_STUDIO_PRIME_AGENT_DIR",
+        r"C:\ContentStudio\runtime\prime-rlm-pilot\agent",
+    )
+)
+OM_PRIME_ADAPTER_SKILL = REPO_ROOT / "integrations" / "prime-om-adapter"
 SCENEPLAN_COLUMNS = [
     "scene_number",
     "cut_id",
@@ -290,6 +306,7 @@ def show_gate_payload(projects_dir: Path, project_id: str | None = None) -> dict
         "allowed_decisions": sorted(GATE_DECISIONS),
         "cut_count": len(cuts),
         "cuts": cuts,
+        "visual_continuity": evaluate_visual_continuity(scene_plan),
     }
 
 
@@ -373,6 +390,12 @@ def apply_sceneplan_decisions(
     ]
     approved = not unresolved
     status = "completed" if approved else "awaiting_human"
+    continuity = evaluate_visual_continuity(scene_plan)
+    if approved and continuity["status"] != "PASS":
+        raise GatewayError(
+            "Visual continuity hard gate blocked approval: "
+            f"{continuity.get('reason')} [{continuity.get('verdict_tag')}]"
+        )
 
     old_artifact_bytes = artifact_path.read_bytes()
     old_artifact_hash = _sha256_bytes(old_artifact_bytes)
@@ -474,6 +497,51 @@ def apply_sceneplan_decisions(
         "new_artifact_sha256": _sha256_file(artifact_path),
         "artifact_history_path": history_path.relative_to(project_dir).as_posix(),
         "prime_resume_allowed": approved,
+        "visual_continuity": continuity,
+    }
+
+
+def _resolve_persistent_session(project_dir: Path) -> dict[str, Any]:
+    """Locate the full Prime .jsonl path for a real resume. Fail closed if absent."""
+    pointer_candidates = [
+        project_dir / "working" / "prime_rlm" / "SESSION_POINTER.json",
+        project_dir / "working" / "prime_rlm" / "SESSION_RECEIPT.json",
+    ]
+    for pointer_path in pointer_candidates:
+        if not pointer_path.is_file():
+            continue
+        pointer = _read_json(pointer_path)
+        session_file = pointer.get("session_file") or pointer.get("session_path")
+        session_dir_value = pointer.get("session_dir")
+        session_dir = Path(session_dir_value) if session_dir_value else DEFAULT_PRIME_SESSION_DIR
+        if session_file:
+            try:
+                resolved = resolve_session_jsonl(session_file, session_dir=session_dir)
+            except SessionPathError as exc:
+                raise GatewayError(str(exc)) from exc
+            return {
+                "session_file": str(resolved),
+                "session_dir": str(session_dir),
+                "session_id": pointer.get("session_id") or resolved.stem,
+                "session_sha256": _sha256_file(resolved),
+                "pointer_path": str(pointer_path),
+                "agent_dir": str(pointer.get("agent_dir") or DEFAULT_PRIME_AGENT_DIR),
+            }
+
+    latest = latest_session_jsonl(DEFAULT_PRIME_SESSION_DIR)
+    if latest is None:
+        raise GatewayError(
+            "No persistent Prime .jsonl session found. Create a named Director session "
+            "and write working/prime_rlm/SESSION_POINTER.json before resume. "
+            "JSON-echo fake resume is forbidden."
+        )
+    return {
+        "session_file": str(latest.resolve()),
+        "session_dir": str(DEFAULT_PRIME_SESSION_DIR),
+        "session_id": latest.stem,
+        "session_sha256": _sha256_file(latest),
+        "pointer_path": None,
+        "agent_dir": str(DEFAULT_PRIME_AGENT_DIR),
     }
 
 
@@ -489,12 +557,13 @@ def prepare_prime_resume(projects_dir: Path, project_id: str | None) -> dict[str
     except (ValueError, IndexError):
         raise GatewayError("Cannot resolve the stage after scene_plan")
     checkpoint_hash = _sha256_file(checkpoint_path)
+    session = _resolve_persistent_session(project_dir)
     request_id = hashlib.sha256(
-        f"{project['project_id']}:{checkpoint_hash}:{_utc_now()}".encode("utf-8")
+        f"{project['project_id']}:{checkpoint_hash}:{session['session_sha256']}:{_utc_now()}".encode("utf-8")
     ).hexdigest()[:20]
     request = {
-        "schema_version": "om-prime-resume-request/v1",
-        "status": "READY_FOR_PRIME",
+        "schema_version": "om-prime-resume-request/v2",
+        "status": "READY_FOR_PERSISTENT_PRIME",
         "request_id": request_id,
         "project_id": project["project_id"],
         "pipeline_type": checkpoint.get("pipeline_type"),
@@ -504,7 +573,19 @@ def prepare_prime_resume(projects_dir: Path, project_id: str | None) -> dict[str
         "entry_channel": "Windows Pi",
         "provider": "bailian",
         "model": "qwen3.8-max",
-        "instruction": "Acknowledge this OM checkpoint only. Do not start asset generation or rendering in the entry smoke.",
+        "resume_mode": "persistent_jsonl",
+        "session_file": session["session_file"],
+        "session_dir": session["session_dir"],
+        "session_id": session["session_id"],
+        "session_sha256": session["session_sha256"],
+        "agent_dir": session["agent_dir"],
+        "skill_path": str(OM_PRIME_ADAPTER_SKILL),
+        "forbidden_flags": ["--no-session", "--no-tools"],
+        "instruction": (
+            "Resume the existing Prime session from session_file. Prove IPython state "
+            "revival or reload. Acknowledge the OM checkpoint. Do not start assets/render. "
+            "Do not use --no-session or --no-tools."
+        ),
         "created_at": _utc_now(),
     }
     request_path = project_dir / "working" / "pi_entry" / "PRIME_RESUME_REQUEST.json"
@@ -533,12 +614,16 @@ def record_prime_resume(
         "project_id": request["project_id"],
         "checkpoint_sha256": request["checkpoint_sha256"],
         "next_stage": request["next_stage"],
+        "session_file": request["session_file"],
+        "resumed": True,
+        "fake_json_echo": False,
     }
     for key, expected in required_matches.items():
         if response.get(key) != expected:
-            raise GatewayError(f"Prime acknowledgement mismatch for {key}")
+            raise GatewayError(f"Prime acknowledgement mismatch for {key}: expected {expected!r}")
+    usage = summarize_session_usage(request["session_file"])
     receipt = {
-        "schema_version": "om-prime-resume-receipt/v1",
+        "schema_version": "om-prime-resume-receipt/v2",
         "status": "PASS",
         "request_id": request_id,
         "project_id": request["project_id"],
@@ -546,6 +631,22 @@ def record_prime_resume(
         "next_stage": request["next_stage"],
         "provider": "bailian",
         "model": "qwen3.8-max",
+        "resume_mode": "persistent_jsonl",
+        "session_file": request["session_file"],
+        "session_dir": request["session_dir"],
+        "session_id": request["session_id"],
+        "session_sha256": request["session_sha256"],
+        "resumed": True,
+        "fake_json_echo": False,
+        "forbidden_flags_absent": True,
+        "usage_ledger": {
+            "parent_tokens": usage["parent_tokens"],
+            "child_tokens": usage["child_tokens"],
+            "aggregate_tokens": usage["aggregate_tokens"],
+            "provider_cost_or_plan_usage": usage["provider_cost_or_plan_usage"],
+            "wall_seconds": usage["wall_seconds"],
+            "status": usage["status"],
+        },
         "prime_response_sha256": _sha256_bytes(prime_response.encode("utf-8")),
         "entry_channel": "Windows Pi",
         "no_mac_relay": True,

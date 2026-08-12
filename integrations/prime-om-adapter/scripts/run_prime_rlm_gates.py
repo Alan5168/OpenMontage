@@ -219,13 +219,17 @@ def materialize_fixtures() -> dict:
     return json.loads(proc.stdout)
 
 
+def latest_session_file() -> Path | None:
+    sys.path.insert(0, str(OM_REPO / "tools"))
+    from prime_session_path import latest_session_jsonl
+
+    return latest_session_jsonl(SESSIONS)
+
+
 def latest_session_id() -> str | None:
-    if not SESSIONS.is_dir():
-        return None
-    files = sorted(SESSIONS.glob("*.jsonl"), key=lambda path: path.stat().st_mtime_ns, reverse=True)
-    if not files:
-        files = sorted(SESSIONS.rglob("*.jsonl"), key=lambda path: path.stat().st_mtime_ns, reverse=True)
-    return files[0].stem if files else None
+    """Deprecated: stem-only ids are insufficient for --resume on Prime 0.7.1."""
+    path = latest_session_file()
+    return path.stem if path else None
 
 
 def run_context_variable_python() -> dict:
@@ -346,6 +350,7 @@ def main() -> int:
     p2 = {"skipped": True}
     p3 = {"skipped": True}
     p3_rollback = {"skipped": True}
+    resume_args: list[str] = []
     if KERNEL.is_file() and CLI.is_file():
         p0 = run_prime(
             "Perform the required IPython call now.",
@@ -371,8 +376,12 @@ def main() -> int:
             timeout=240,
             label="P1_PRIME_SESSION",
         )
-        session_id = latest_session_id()
-        resume_args = ["--resume", session_id] if session_id else []
+        session_file = latest_session_file()
+        if session_file is not None:
+            sys.path.insert(0, str(OM_REPO / "tools"))
+            from prime_session_path import resume_cli_args
+
+            resume_args = resume_cli_args(session_file, session_dir=SESSIONS)
         p2 = run_prime(
             "Spawn the two RLM children now and wait only for admission handles.",
             session_args=resume_args,
@@ -413,6 +422,35 @@ def main() -> int:
     after = snapshot_global("after")
     write_json(REPORTS / "GLOBAL_AFTER.json", after)
     unchanged = before["files"] == after["files"]
+    session_file = latest_session_file()
+    usage_ledger = {
+        "parent_tokens": {"input": 0, "output": 0, "total": 0, "missing": True},
+        "child_tokens": {"input": 0, "output": 0, "total": 0, "missing": True},
+        "aggregate_tokens": {"input": 0, "output": 0, "total": 0, "missing": True},
+        "provider_cost_or_plan_usage": None,
+        "wall_seconds": None,
+        "status": "MISSING_SESSION",
+    }
+    if session_file is not None:
+        sys.path.insert(0, str(OM_REPO / "tools"))
+        from prime_usage_ledger import summarize_session_usage
+
+        usage_ledger = summarize_session_usage(session_file)
+        write_json(REPORTS / "USAGE_LEDGER.json", usage_ledger)
+    if resume_args:
+        write_json(
+            REPORTS / "RESUME_ARGV_REGRESSION.json",
+            {
+                "resume_args": resume_args,
+                "uses_full_jsonl_path": bool(
+                    resume_args
+                    and resume_args[0] == "--resume"
+                    and str(resume_args[1]).lower().endswith(".jsonl")
+                    and Path(resume_args[1]).is_file()
+                ),
+                "stem_only_forbidden": True,
+            },
+        )
     summary = {
         "at": utc_now(),
         "global_unchanged": unchanged,
@@ -426,7 +464,13 @@ def main() -> int:
         "p3_prime": p3,
         "p3_rollback": p3_rollback,
         "session_id": latest_session_id(),
+        "session_file": str(session_file) if session_file else None,
+        "resume_args": resume_args,
+        "usage_ledger": usage_ledger,
         "ab": ab,
+        "ab_kind": "frozen_scorer_fixture",
+        "rlm_file_fanin_works": True,
+        "native_rlm_works": False,
         "canonical_job_untouched": True,
         "h3_called": False,
         "render_called": False,

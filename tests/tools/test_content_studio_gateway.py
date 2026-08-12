@@ -189,8 +189,33 @@ def test_full_approval_archives_old_hash_and_survives_reload(tmp_path: Path):
     assert list((project_dir / "history").glob("checkpoint_scene_plan_*.json"))
 
 
-def test_prime_resume_request_and_receipt_are_bound_to_checkpoint(tmp_path: Path):
-    projects, _project_dir = _fixture_projects(tmp_path)
+def test_prime_resume_request_and_receipt_are_bound_to_checkpoint(tmp_path: Path, monkeypatch):
+    projects, project_dir = _fixture_projects(tmp_path)
+    sessions = tmp_path / "prime-sessions"
+    sessions.mkdir()
+    session_file = sessions / "fixture-director.jsonl"
+    session_file.write_text(
+        json.dumps({"type": "session_info", "name": "fixture-director"}) + "\n"
+        + json.dumps(
+            {
+                "type": "message",
+                "message": {
+                    "role": "assistant",
+                    "usage": {"input": 10, "output": 4, "totalTokens": 14, "cost": {"total": 0.0}},
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "tools.content_studio_gateway.DEFAULT_PRIME_SESSION_DIR",
+        sessions,
+    )
+    monkeypatch.setattr(
+        "tools.content_studio_gateway.DEFAULT_PRIME_AGENT_DIR",
+        tmp_path / "prime-agent",
+    )
     gate = show_gate_payload(projects)
     apply_sceneplan_decisions(
         projects,
@@ -202,17 +227,75 @@ def test_prime_resume_request_and_receipt_are_bound_to_checkpoint(tmp_path: Path
         ],
     )
     request = prepare_prime_resume(projects, None)
+    assert request["schema_version"] == "om-prime-resume-request/v2"
+    assert request["session_file"].endswith(".jsonl")
+    assert "--no-session" in request["forbidden_flags"]
     response = json.dumps(
         {
             "status": "PRIME_OM_RESUME_ACCEPTED",
             "project_id": request["project_id"],
             "checkpoint_sha256": request["checkpoint_sha256"],
             "next_stage": request["next_stage"],
+            "session_file": request["session_file"],
+            "resumed": True,
+            "fake_json_echo": False,
         }
     )
     receipt = record_prime_resume(projects, None, request["request_id"], response)
     assert receipt["status"] == "PASS"
+    assert receipt["schema_version"] == "om-prime-resume-receipt/v2"
+    assert receipt["resumed"] is True
+    assert receipt["fake_json_echo"] is False
+    assert receipt["usage_ledger"]["aggregate_tokens"]["total"] == 14
     assert receipt["provider"] == "bailian"
     assert receipt["model"] == "qwen3.8-max"
     assert receipt["production_started"] is False
     assert status_payload(projects, None)["prime_resume_receipt"]["status"] == "PASS"
+
+    with pytest.raises(GatewayError, match="acknowledgement mismatch"):
+        record_prime_resume(
+            projects,
+            None,
+            request["request_id"],
+            json.dumps(
+                {
+                    "status": "PRIME_OM_RESUME_ACCEPTED",
+                    "project_id": request["project_id"],
+                    "checkpoint_sha256": request["checkpoint_sha256"],
+                    "next_stage": request["next_stage"],
+                }
+            ),
+        )
+
+
+def test_independent_t2i_mothers_cannot_be_approved(tmp_path: Path):
+    projects, project_dir = _fixture_projects(tmp_path)
+    plan = _scene_plan()
+    plan["scenes"][1].pop("reuse")
+    plan["scenes"][1]["t2i_prompt"] = "different camera different world"
+    (project_dir / "artifacts" / "scene_plan.json").write_text(
+        json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    write_checkpoint(
+        projects,
+        "fixture-sceneplan-gate",
+        "scene_plan",
+        "awaiting_human",
+        {"scene_plan": plan},
+        pipeline_type="unknown",
+        style_playbook="premium-minimalist",
+        human_approval_required=True,
+        human_approved=False,
+    )
+    gate = show_gate_payload(projects)
+    assert gate["visual_continuity"]["status"] == "FAIL"
+    with pytest.raises(GatewayError, match="Visual continuity hard gate"):
+        apply_sceneplan_decisions(
+            projects,
+            None,
+            gate["checkpoint"]["sha256"],
+            [
+                {"cut_id": "c01", "decision": "keep"},
+                {"cut_id": "c02", "decision": "keep"},
+            ],
+        )
