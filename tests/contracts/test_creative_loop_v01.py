@@ -170,6 +170,25 @@ def test_learning_event_forbids_retrieval(tmp_path):
         retrieve_learning_events()
 
 
+def test_learning_event_accepts_human_reject(tmp_path):
+    event = {
+        "version": "learning-event/v0.1",
+        "artifact": "draft.mp4",
+        "failure_observed": "orphan_line",
+        "evidence": "widow glyph on line 2",
+        "failure_class": "orphan_line",
+        "constraint_class": "hard",
+        "repair": "none",
+        "result": "human_reject",
+        "human_accept": "reject",
+        "human_reason": "orphan line",
+        "applies_when": "CJK overlay",
+        "counterexample": "none for glyph clip",
+        "auto_retrieve": False,
+    }
+    write_learning_event(tmp_path / "LEARNING_EVENT.json", event)
+
+
 def test_publish_cannot_skip_the_repair_cycle():
     stages = get_pipeline_stages("animated-explainer")
     assert stages.index("visual_review") < stages.index("rerender")

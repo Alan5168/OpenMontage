@@ -29,10 +29,8 @@
     "repair": { "type": "string" },
     "result": { "type": "string" },
     "human_accept": {
-      "oneOf": [
-        { "type": "boolean" },
-        { "type": "string", "enum": ["pending"] }
-      ]
+      "type": "string",
+      "enum": ["pending", "accept", "reject"]
     },
     "human_reason": { "type": "string" },
     "applies_when": { "type": "string" },
