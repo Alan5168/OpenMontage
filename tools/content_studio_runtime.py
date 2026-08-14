@@ -84,6 +84,13 @@ SERVICES: dict[str, dict[str, Any]] = {
 
 ORDER = ("qdrant", "embedding", "openviking")
 
+# User-env names forwarded into the OpenViking launcher from HKCU at start.
+# Values are never written into launch.cmd.
+OV_USER_ENV_FORWARD = (
+    "BAILIAN_TOKENPLAN_API_KEY",
+    "BAILIAN_TOKENPLAN_BASE",
+)
+
 
 class RuntimeError_(RuntimeError):
     pass
@@ -183,10 +190,19 @@ def _write_launcher(name: str) -> Path:
     launcher = log_dir / "launch.cmd"
     args = subprocess.list2cmdline(spec["argv"])
     env_lines = [f"set {k}={v}" for k, v in (spec.get("env") or {}).items()]
+    hkcu_lines: list[str] = []
+    if name == "openviking":
+        hkcu_lines.append("REM Forward Token Plan from HKCU User env; do not hardcode secrets.")
+        for var in OV_USER_ENV_FORWARD:
+            hkcu_lines.append(
+                'for /f "tokens=2,*" %%A in (\'reg query "HKCU\\Environment" '
+                f'/v {var} 2^>nul\') do set "{var}=%%B"'
+            )
     launcher.write_text(
         "@echo off\r\n"
         f"cd /d {spec.get('cwd') or '.'}\r\n"
         + "".join(f"{line}\r\n" for line in env_lines)
+        + "".join(f"{line}\r\n" for line in hkcu_lines)
         + f"{args} >> \"{stdout_path}\" 2>> \"{stderr_path}\"\r\n",
         encoding="ascii",
     )

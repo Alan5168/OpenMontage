@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "style_playbook": "anime-ghibli",
+  "scenes": [
+    {
+      "id": "c001",
+      "type": "character_scene",
+      "description": "Jesse freezes in the kitchen doorway holding a crumpled note.",
+      "script_section_id": "s1",
+      "start_seconds": 0,
+      "end_seconds": 4,
+      "layout_notes": "Medium shot; doorway frame; note in left hand; no readable text on the paper.",
+      "visual_intent": "让观众看见 Jesse 停在门口、纸条已经在手里，还没开口。",
+      "t2i_prompt": "textless limited-animation layout, kitchen doorway, young man holding crumpled note, medium shot",
+      "dialogue": "I found this.",
+      "voice_segment_ids": ["v1"],
+      "voice_segment_refs": [{"segment_id": "v1", "start_ms": 0, "end_ms": 1800}],
+      "animation_class": "LIMITED",
+      "character_ids": ["jesse"],
+      "costume_ids": ["jesse-kitchen-01"],
+      "start_frame_ref": "bible/jesse/approved/idle_doorway.png",
+      "end_frame_ref": "bible/jesse/approved/note_raised.png",
+      "primary_model": "pending-master-sheet",
+      "fallback_models": [],
+      "generation_status": "pending",
+      "visual_ref": {"kind": "placeholder", "placeholder_reason": "Approved stills not locked; render forbidden."},
+      "sound_intent": {"se": ["paper crinkle"], "bgm_mood": "held breath", "silence": false},
+      "motion_route": "HOLD",
+      "review_decision": "pending"
+    }
+  ],
+  "metadata": {
+    "project_id": "vid3-blacklisted-chef-90s-v1",
+    "pipeline": "anime-hybrid",
+    "profile": "fiction_anime_episode",
+    "target_duration_seconds": 90,
+    "render_allowed": false,
+    "waiting_on": ["approved_stills", "animatic_lock", "master_sheet"]
+  }
+}

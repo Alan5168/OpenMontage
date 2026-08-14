@@ -1,0 +1,9 @@
+{
+  "schema_version": "content-studio-t5-trae-attach/v1",
+  "attached_from": "trae_integrated_terminal",
+  "project_id": "pilot-ai-content-os-state-machine-zh-v1",
+  "session_id": "replace-with-real-session-id",
+  "not_pi_relay": true,
+  "exact_session_resume": true,
+  "checked_at": "2026-08-14T00:00:00+00:00"
+}

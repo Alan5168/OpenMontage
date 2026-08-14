@@ -16,7 +16,15 @@ build/
 .ruff_cache/
 htmlcov/
 .coverage
-.trae/
+# Trae user/session junk stays local. Project rule + director skill + curated
+# memory seed are harness files and must be committed (GOAL §4 / §13).
+.trae/*
+!.trae/rules/
+!.trae/rules/**
+!.trae/skills/
+!.trae/skills/**
+!.trae/memory/
+!.trae/memory/project_memory.md
 .idea/
 .vscode/
 

@@ -315,10 +315,26 @@ def run_t5() -> dict[str, Any]:
     exists = Path(session).is_file()
     if not exists:
         return _not_proven("session jsonl 不在磁盘", session=session)
+    receipt = REPORTS / "T5_TRAE_ATTACH.json"
+    if receipt.is_file():
+        attach = json.loads(receipt.read_text(encoding="utf-8"))
+        if (
+            attach.get("attached_from") == "trae_integrated_terminal"
+            and attach.get("not_pi_relay") is True
+            and attach.get("project_id") == "pilot-ai-content-os-state-machine-zh-v1"
+        ):
+            return _pass(
+                "Trae terminal attach 收据存在",
+                pointer=str(pointer),
+                session_exists=exists,
+                receipt=str(receipt),
+            )
+        return _not_proven("T5 收据字段不完整", receipt=attach)
     return _not_proven(
-        "pointer 与 jsonl 存在，但本轮未做 Trae terminal 真人 attach",
+        "pointer 与 jsonl 存在，但缺少 Trae terminal 真人 attach 收据",
         pointer=str(pointer),
         session_exists=exists,
+        receipt_needed=str(receipt),
     )
 
 

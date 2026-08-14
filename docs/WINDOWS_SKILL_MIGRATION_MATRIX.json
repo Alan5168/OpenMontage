@@ -1,0 +1,23 @@
+{
+  "schema_version": "windows-skill-migration-matrix/v1",
+  "as_of": "2026-08-14",
+  "trae_entry_skill": "content-studio-director",
+  "mcp": "forbidden",
+  "rule": "Do not enable OM .agents/skills discovery. New lessons go to OM validator/director/casebook, not a second Trae skill.",
+  "items": [
+    {"skill": "content-studio-director", "decision": "KEEP_AS_PROJECT_SKILL", "note": "Only Trae entry."},
+    {"skill": "OM comic-nonfiction / anime-hybrid / character-animation directors", "decision": "ABSORBED_INTO_OM", "note": "Production skills stay in OM scenario catalog."},
+    {"skill": "creative-shortvideo-visual-pipeline", "decision": "ABSORBED_INTO_OM", "note": "Comic visual contract lives in OM scene_plan + overlay L0."},
+    {"skill": "nf-goodcase-digestion", "decision": "ABSORBED_INTO_OM", "note": "Goodcase retrieval via OpenViking find, not a Trae skill."},
+    {"skill": "research-digest", "decision": "ABSORBED_INTO_OM", "note": "comic-nonfiction research stage."},
+    {"skill": "creative-shortdrama-zh", "decision": "ABSORBED_INTO_OM", "note": "Fiction comic uses anime-hybrid, not a new Trae skill."},
+    {"skill": "design-report-explainer", "decision": "RETIRE", "note": "Explainer is not a Windows lane."},
+    {"skill": "creative-nonfiction-longvideo-zh", "decision": "RETIRE", "note": "Explainer/long NF is not Windows."},
+    {"skill": "alan-shortform-studio", "decision": "REFERENCE_ONLY", "note": "Mac writing/studio; Windows does not copy it."},
+    {"skill": "stop-slop", "decision": "REFERENCE_ONLY"},
+    {"skill": "taste-skill", "decision": "REFERENCE_ONLY"},
+    {"skill": "agnes-multimodal", "decision": "REFERENCE_ONLY", "note": "Optional still captions later; not T10 text find."},
+    {"skill": "local-vision-ocr", "decision": "REFERENCE_ONLY"},
+    {"skill": "quant-harness", "decision": "RETIRE", "note": "Quant stays Mac."}
+  ]
+}

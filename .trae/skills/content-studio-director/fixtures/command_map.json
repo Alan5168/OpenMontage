@@ -1,0 +1,21 @@
+{
+  "schema_version": "content-studio-trae-command-map/v1",
+  "classes": {
+    "read-only": [
+      "tools/content_studio_gateway.py current",
+      "tools/content_studio_gateway.py show-gate",
+      "tools/content_studio_gateway.py status",
+      "tools/content_studio_async_console.py job-status",
+      "tools/om_context_bridge.py search"
+    ],
+    "submit-job": [
+      "tools/content_studio_async_console.py submit-continuity-regen",
+      "tools/content_studio_async_console.py build-review-packet"
+    ],
+    "human-write": [
+      "tools/content_studio_gateway.py apply-sceneplan",
+      "tools/run_content_studio_prime_chat.py"
+    ]
+  },
+  "forbidden": ["mcp", "H3", "render", "publish", "checkpoint PASS"]
+}

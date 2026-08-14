@@ -1,30 +1,66 @@
-# Content Studio Director Skill
+---
+name: content-studio-director
+description: >
+  Windows Content Studio 导演入口。仅在 Alan 要看当前 Gate、提交异步重生、
+  审 review packet / 真图、写入 cut decisions、或从 Trae 终端 attach Direct Prime
+  时使用。普通编码、重构、新 pipeline、MCP 安装不要触发本 skill。
+---
 
-## 触发条件
-当 Alan 在 OpenMontage workspace 中请求内容状态查看、Sceneplan Gate 审阅、异步重生、视觉 QA、Prime 恢复或 receipt 查询时触发。普通编码任务不触发。
+# Content Studio Director
 
-## 命令清单
+只调用下面固定 CLI。禁止现场拼 Python / PowerShell。禁止写 checkpoint / PASS。
 
-### 只读命令（read-only）
-- `current` — 显示当前项目状态：阶段、status、awaiting_human
-- `status --project-id <id>` — 项目完整状态含 Sceneplan Gate + Prime resume receipt
-- `show-gate --project-id <id>` — 打开 Sceneplan Gate：显示 cuts、contact sheet、continuity
-- `job-status --job-id <id>` — 查询异步 job 状态
-- `context search <query>` — 检索 OpenViking 资源/知识/goodcase
-- `media search <query>` — 检索 Qdrant 素材库（14,133 points）
-- `context health` — OpenViking + Qdrant 健康检查
+工作目录必须是本 OpenMontage 仓库。`--project-id` 从 Alan 或 `current` 输出读取，不要猜。
 
-### 提交命令（submit-job）
-- `submit-continuity-regen --project-id <id>` — 按 VCP 异步重生，5 秒内返回 ACCEPTED + job_id
-- `build-review-packet --project-id <id>` — 构建 review packet（contact sheet + manifest + images）
+## 只读
 
-### 人工写入命令（human-write）
-- `apply-sceneplan --expected-checkpoint-sha256 ... --decisions-json ...` — 应用 Alan 的 cut decisions
-- `open-prime --project-id <id>` — 从 Trae terminal 打开 Direct Prime（项目绑定 session）
+```text
+python tools/content_studio_gateway.py --project-id <id> current
+python tools/content_studio_gateway.py --project-id <id> show-gate
+python tools/content_studio_gateway.py --project-id <id> status
+python tools/content_studio_async_console.py --project-id <id> job-status --job-id <job>
+python tools/om_context_bridge.py search "<query>" --top-k 5
+```
 
-## 使用约束
-- 优先调用固定 CLI，不现场拼 Python/PowerShell。
-- provider/model 从项目配置读取，不写死在 prompt 中。
-- 只引用 repo-relative 文件路径。
-- VISUAL_QA 必须基于真实图片输入，输出统一 schema。
-- 失败返回 receipt，可重试，不要求 Alan 重贴上下文。
+## 提交异步 job（≤5s 返回）
+
+```text
+python tools/content_studio_async_console.py --project-id <id> submit-continuity-regen
+python tools/content_studio_async_console.py --project-id <id> build-review-packet
+```
+
+未获 Alan 当场授权，不要提交 H3 / render / publish。
+
+## 看图 / Visual QA
+
+必须打开真实图片，不能只读 JSON。
+
+```text
+python tools/visual_qa.py --project-id <id> --image-dir <review_packet/images>
+```
+
+## 写入 Alan 决定（human-write）
+
+先 `show-gate` 取 `checkpoint_sha256`，再：
+
+```text
+python tools/content_studio_gateway.py --project-id <id> apply-sceneplan --expected-checkpoint-sha256 <sha> --decisions-json "<json>"
+```
+
+`decisions-json` 只能是 Alan 给出的 keep/change/merge/omit。Agent 不得代批。
+
+## Direct Prime（T5）
+
+在 **Trae 集成终端**（不是 Pi、不是 Cursor）执行：
+
+```text
+python tools/run_content_studio_prime_chat.py --project-id pilot-ai-content-os-state-machine-zh-v1
+```
+
+等价：`python tools/content_studio_async_console.py --project-id <id> open-prime`
+
+成功 resume 后，由 Alan 在 `C:\ContentStudio\reports\windows-trae-native-content-harness-v1\T5_TRAE_ATTACH.json` 写收据（见 `fixtures/t5_trae_attach.example.json`）。没有这张收据，T5 保持 NOT_PROVEN。
+
+## 失败
+
+同一命令失败三次停止，报告 root cause。结束写 receipt，不改本 skill、不接 MCP。

@@ -1,0 +1,24 @@
+{
+  "schema_version": "content-studio-vid3-job-skeleton/v1",
+  "project_id": "vid3-blacklisted-chef-90s-v1",
+  "pipeline": "anime-hybrid",
+  "profile": "fiction_anime_episode",
+  "status": "WAITING_APPROVED_STILLS_AND_MASTER_SHEET",
+  "render_allowed": false,
+  "proving_object": "VID-3 Blacklisted Chef 90s limited-animation restart",
+  "om_owns_status": true,
+  "pi_may_emit": ["submitted", "completed", "failed"],
+  "pi_must_not_write": ["PASS", "APPROVED", "checkpoint"],
+  "shot_fields_live_on": "scene_plan.scenes[]",
+  "animation_class_split": {
+    "LIMITED": "55-70 percent of cuts",
+    "I2V_STANDARD": "minority",
+    "I2V_HARD": "exception"
+  },
+  "waiting_on": [
+    "Alan master sheet",
+    "OM-approved character stills",
+    "animatic lock",
+    "per-cut animation_class"
+  ]
+}
