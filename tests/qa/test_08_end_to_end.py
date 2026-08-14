@@ -460,6 +460,20 @@ write_checkpoint(
     pipeline_type="animated-explainer",
 )
 
+overlay_preflight = {
+    "version": "overlay-preflight/v0.1",
+    "ok": True,
+    "canvas": {"width": 1080, "height": 1920},
+    "jobs": [],
+    "unresolved": [],
+}
+validate_artifact("overlay_preflight", overlay_preflight)
+write_checkpoint(
+    PIPELINE_DIR, PROJECT_ID, "overlay_preflight", "completed",
+    artifacts={"overlay_preflight": overlay_preflight},
+    pipeline_type="animated-explainer",
+)
+
 # ===================================================================
 # Stage 6: compose (REAL tool execution)
 # ===================================================================
@@ -743,11 +757,12 @@ write_checkpoint(
 print("\n--- Final validation ---")
 
 E2E_STAGES = [
-    "research", "proposal", "script", "scene_plan", "assets", "edit", "compose",
+    "research", "proposal", "script", "scene_plan", "assets", "edit",
+    "overlay_preflight", "compose",
     "visual_review", "repair_plan", "patch", "rerender", "publish",
 ]
 completed = get_completed_stages(PIPELINE_DIR, PROJECT_ID, "animated-explainer")
-check("All 12 stages completed", len(completed) == 12, f"completed={completed}")
+check("All 13 stages completed", len(completed) == 13, f"completed={completed}")
 check("Next stage is None (done)", get_next_stage(PIPELINE_DIR, PROJECT_ID, "animated-explainer") is None)
 check("Stages in correct order", completed == E2E_STAGES, f"{completed}")
 

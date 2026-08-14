@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/overlay_preflight",
+  "title": "Overlay Preflight",
+  "description": "L0 overlay compiler result. ok=false blocks compose. Models must not override.",
+  "type": "object",
+  "required": ["version", "ok", "jobs"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "const": "overlay-preflight/v0.1" },
+    "ok": { "type": "boolean" },
+    "canvas": {
+      "type": "object",
+      "properties": {
+        "width": { "type": "integer" },
+        "height": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "ok"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "kind": { "type": "string" },
+          "source_text": { "type": "string" },
+          "text": { "type": "string" },
+          "lines": { "type": "array", "items": { "type": "string" } },
+          "font_size": { "type": "number" },
+          "repairs": { "type": "array", "items": { "type": "string" } },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["code", "detail"],
+              "additionalProperties": false,
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "enum": ["glyph_clip", "orphan_line", "max_lines", "safe_area", "empty_text"]
+                },
+                "detail": { "type": "string" }
+              }
+            }
+          },
+          "ok": { "type": "boolean" }
+        }
+      }
+    },
+    "unresolved": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "issues"],
+        "additionalProperties": true
+      }
+    }
+  }
+}

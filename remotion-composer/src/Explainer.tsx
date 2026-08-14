@@ -264,6 +264,7 @@ interface Overlay {
   subtitle?: string;
   accentColor?: string;
   position?: string;
+  fontSize?: number;
   // provider_chip
   providers?: string[];
   cycleSeconds?: number;
@@ -607,7 +608,7 @@ const SceneRenderer: React.FC<{ cut: Cut; theme: ThemeConfig }> = ({ cut, theme 
   }
   if (cut.type === "hero_title" && cut.text) {
     return maybeWrapWithBg(
-      <HeroTitle title={cut.text} subtitle={cut.heroSubtitle || cut.subtitle} />
+      <HeroTitle title={cut.text} subtitle={cut.heroSubtitle || cut.subtitle} fontSize={cut.fontSize} />
     );
   }
   if (cut.type === "terminal_scene" && cut.steps) {
@@ -774,7 +775,7 @@ const OverlayRenderer: React.FC<{ overlay: Overlay }> = ({ overlay }) => {
     );
   }
   if (overlay.type === "hero_title") {
-    return <HeroTitle title={overlay.text ?? ""} subtitle={overlay.subtitle} />;
+    return <HeroTitle title={overlay.text ?? ""} subtitle={overlay.subtitle} fontSize={overlay.fontSize} />;
   }
   if (overlay.type === "provider_chip" && overlay.providers) {
     return (

@@ -9,13 +9,69 @@ import {
 type HeroTitleProps = {
   title: string;
   subtitle?: string;
+  fontSize?: number;
 };
 
-export const HeroTitle: React.FC<HeroTitleProps> = ({ title, subtitle }) => {
+export const HeroTitle: React.FC<HeroTitleProps> = ({
+  title,
+  subtitle,
+  fontSize = 72,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const isCjk = /[\u3400-\u9fff]/.test(title);
 
-  // Staggered letter-by-letter spring
+  if (isCjk) {
+    const subtitleSpring = spring({
+      frame: frame - 8,
+      fps,
+      config: { damping: 20 },
+    });
+    return (
+      <AbsoluteFill
+        style={{
+          justifyContent: "center",
+          alignItems: "center",
+          background:
+            "radial-gradient(ellipse at center, rgba(15,23,42,0.35) 0%, rgba(15,23,42,0.55) 100%)",
+        }}
+      >
+        <div style={{ textAlign: "center", maxWidth: "85%" }}>
+          <div
+            style={{
+              fontSize,
+              fontWeight: 800,
+              fontFamily:
+                "system-ui, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif",
+              lineHeight: 1.2,
+              color: "#F8FAFC",
+              whiteSpace: "pre-line",
+              overflowWrap: "break-word",
+            }}
+          >
+            {title}
+          </div>
+          {subtitle && (
+            <div
+              style={{
+                marginTop: 20,
+                opacity: subtitleSpring,
+                fontSize: 28,
+                fontWeight: 400,
+                color: "#A78BFA",
+                fontFamily:
+                  "system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif",
+              }}
+            >
+              {subtitle}
+            </div>
+          )}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+
+  // Latin titles keep letter-by-letter spring
   const titleChars = title.split("");
 
   return (

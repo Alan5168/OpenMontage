@@ -217,9 +217,29 @@ stages:
       - Schema-valid edit_decisions
       - Full video duration covered
 
+  - name: overlay_preflight
+    skill: pipelines/explainer/creative-loop-director
+    required_artifacts_in:
+      - edit_decisions
+    optional_artifacts_in:
+      - scene_plan
+    produces:
+      - overlay_preflight
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Glyph clip, CJK orphan lines, and safe-area overflow are machine FAILs
+      - Automatic wrap/font repair at most twice
+      - Models must not discuss L0 layout
+    success_criteria:
+      - Schema-valid overlay_preflight with ok=true
+      - unresolved is empty
+
   - name: compose
     skill: pipelines/explainer/compose-director
     required_artifacts_in:
+      - overlay_preflight
       - edit_decisions
       - asset_manifest
     optional_artifacts_in:

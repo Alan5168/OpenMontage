@@ -108,9 +108,22 @@ stages:
     checkpoint_required: true
     human_approval_default: false
     success_criteria: [Cut ids equal scene ids, Subtitle clock equals voice timing, Repair scope is cut-local]
+  - name: overlay_preflight
+    skill: pipelines/research-report-explainer/quality-director
+    required_artifacts_in: [edit_decisions]
+    optional_artifacts_in: [scene_plan]
+    produces: [overlay_preflight]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Glyph clip, CJK orphan lines, and safe-area overflow are machine FAILs
+      - Automatic wrap/font repair at most twice
+      - Models must not discuss L0 layout
+    success_criteria: [Schema-valid overlay_preflight with ok=true]
   - name: compose
     skill: pipelines/research-report-explainer/edit-compose-director
-    required_artifacts_in: [edit_decisions, asset_manifest, voice_timing]
+    required_artifacts_in: [overlay_preflight, edit_decisions, asset_manifest, voice_timing]
     produces: [render_report]
     tools_available: [video_compose, audio_mixer, video_stitch]
     checkpoint_required: true

@@ -42,6 +42,7 @@ ARTIFACT_NAMES = [
     "repair_plan",
     "patch_receipt",
     "learning_event",
+    "overlay_preflight",
 ]
 
 

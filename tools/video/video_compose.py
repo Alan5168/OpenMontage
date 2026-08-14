@@ -453,6 +453,10 @@ class VideoCompose(BaseTool):
         if not edit_decisions:
             return ToolResult(success=False, error="edit_decisions required for compose")
 
+        preflight_block, edit_decisions = self._overlay_preflight_gate(edit_decisions, inputs)
+        if preflight_block is not None:
+            return preflight_block
+
         output_path = Path(inputs.get("output_path", "composed_output.mp4"))
         output_path.parent.mkdir(parents=True, exist_ok=True)
         audio_path = inputs.get("audio_path")
@@ -1005,7 +1009,20 @@ class VideoCompose(BaseTool):
             pp = Path(props_path).resolve()
             if not pp.exists():
                 return ToolResult(success=False, error=f"atelier props_path not found: {pp}")
-            # Equals form is required for cross-platform path parsing (see _remotion_render).
+            try:
+                props = json.loads(pp.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                return ToolResult(success=False, error=f"atelier props_path is not JSON: {exc}")
+            if isinstance(props, dict) and (props.get("overlays") or props.get("cuts") or (props.get("metadata") or {}).get("text_overlays")):
+                block, patched = self._overlay_preflight_gate(props, inputs)
+                if block is not None:
+                    return block
+                patched_path = output_path.parent / "atelier_props_preflight.json"
+                patched_path.write_text(
+                    json.dumps(patched, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+                pp = patched_path
             cmd.append(f"--props={pp}")
 
         public_dir = bespoke.get("public_dir")
@@ -1493,6 +1510,40 @@ class VideoCompose(BaseTool):
 
         return None
 
+    def _overlay_preflight_gate(
+        self,
+        edit_decisions: dict[str, Any],
+        inputs: dict[str, Any],
+    ) -> tuple[ToolResult | None, dict[str, Any]]:
+        """Block the 160s render on unresolved L0 overlay issues. No model."""
+        from lib.overlay_preflight import format_block_error, run_overlay_preflight, write_report
+
+        log = logging.getLogger("video_compose")
+        profile = inputs.get("profile") or inputs.get("output_profile") or {}
+        canvas_cfg = profile.get("canvas") if isinstance(profile, dict) else None
+        if not isinstance(canvas_cfg, dict):
+            canvas_cfg = {}
+        width = int(canvas_cfg.get("width") or 1080)
+        height = int(canvas_cfg.get("height") or 1920)
+        scene_plan = inputs.get("scene_plan")
+        if isinstance(scene_plan, list):
+            scene_plan = {"scenes": scene_plan}
+        report = run_overlay_preflight(
+            edit_decisions,
+            scene_plan if isinstance(scene_plan, dict) else None,
+            canvas=(width, height),
+        )
+        out_dir = inputs.get("output_path")
+        if out_dir:
+            report_path = Path(out_dir).resolve().parent / "overlay_preflight.json"
+            try:
+                write_report(report_path, report)
+            except OSError as exc:
+                log.warning("Could not write overlay_preflight.json: %s", exc)
+        if not report["ok"]:
+            return ToolResult(success=False, error=format_block_error(report)), edit_decisions
+        return None, report["patched_edit_decisions"]
+
     def _render(self, inputs: dict[str, Any]) -> ToolResult:
         """High-level render: assemble edit decisions + asset manifest into final video.
 
@@ -1534,6 +1585,10 @@ class VideoCompose(BaseTool):
                     "explicit runtime choice — do NOT default this field."
                 ),
             )
+
+        preflight_block, edit_decisions = self._overlay_preflight_gate(edit_decisions, inputs)
+        if preflight_block is not None:
+            return preflight_block
 
         if render_runtime not in {"remotion", "hyperframes", "ffmpeg"}:
             return ToolResult(
@@ -1917,6 +1972,9 @@ class VideoCompose(BaseTool):
 
         # Deep-copy props so we don't mutate the original
         props = json.loads(json.dumps(composition_data))
+        block, props = self._overlay_preflight_gate(props, inputs)
+        if block is not None:
+            return block
 
         # Build a custom themeConfig from the playbook's actual colors.
         # This ensures every video gets a unique visual identity derived

@@ -2,6 +2,14 @@
 
 This stage is graph-enforced. `render_success=true` is not SEE.
 
+## Overlay L0 (before compose)
+
+Run `python tools/overlay_preflight.py --edit-decisions <edit.json> --out <overlay_preflight.json>`.
+Glyph clip, a last line of one CJK character, and safe-area overflow are compiler errors.
+The tool may wrap or shrink font at most twice. If still FAIL, do not render and do not call Qwen.
+Human and editorial critique must not see known L0 failures.
+On-screen CJK must live in `cuts[].text`, `overlays[].text`, or `metadata.text_overlays[].text`. A baked PNG with no text field is invisible to this compiler — do not put K1 titles only in an image.
+
 ## SEE
 
 Run `python tools/creative_loop.py extract-frames --mp4 <draft.mp4> --out <dir> --anchors <script times>`.

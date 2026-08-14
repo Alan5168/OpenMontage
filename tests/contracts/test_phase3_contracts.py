@@ -720,6 +720,7 @@ class TestAnimatedExplainerManifest:
             "scene_plan",
             "assets",
             "edit",
+            "overlay_preflight",
             "compose",
             "visual_review",
             "repair_plan",

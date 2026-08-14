@@ -102,6 +102,11 @@ def test_animated_explainer_has_explicit_reentry():
         "rerender",
         "publish",
     ]
+    assert order[order.index("edit") : order.index("compose") + 1] == [
+        "edit",
+        "overlay_preflight",
+        "compose",
+    ]
     rerender = next(s for s in manifest["stages"] if s["name"] == "rerender")
     assert rerender["reentry"]["of"] == "compose"
     assert rerender["reentry"]["required_cycle"] is True
@@ -117,6 +122,9 @@ def test_research_report_explainer_has_explicit_reentry():
         "rerender",
         "independent_qa",
     ]
+    assert get_pipeline_stages("research-report-explainer").index("overlay_preflight") < (
+        get_pipeline_stages("research-report-explainer").index("compose")
+    )
 
 
 def test_intent_rejects_checklist_fields():
