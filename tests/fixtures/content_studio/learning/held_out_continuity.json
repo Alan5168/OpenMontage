@@ -1,0 +1,18 @@
+{
+  "schema_version": "content-studio-held-out-continuity/v1",
+  "description": "Frozen continuity held-out: similar frames PASS, red vs blue FAIL.",
+  "cases": [
+    {
+      "id": "similar-gray",
+      "left": "same_a.png",
+      "right": "same_b.png",
+      "expected_continuity": "PASS"
+    },
+    {
+      "id": "red-vs-blue",
+      "left": "red.png",
+      "right": "blue.png",
+      "expected_continuity": "FAIL"
+    }
+  ]
+}

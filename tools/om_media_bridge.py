@@ -27,15 +27,20 @@ MEDIA_STOCK_ROOT = Path(
     os.environ.get("MEDIA_STOCK_ROOT", r"C:\ContentStudio\media\stock")
 )
 
-# embedding 服务端点（本地）
-EMBEDDING_URL = os.environ.get("EMBEDDING_URL", "http://127.0.0.1:8001/embed")
-EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "Qwen3-Embedding-0.6B")
+# embedding 服务端点：与 OpenViking 共用 18889，禁止再默认 8001。
+EMBEDDING_URL = os.environ.get("EMBEDDING_URL", "http://127.0.0.1:18889/embed")
+EMBEDDING_OPENAI_URL = os.environ.get(
+    "EMBEDDING_OPENAI_URL", "http://127.0.0.1:18889/v1/embeddings"
+)
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "qwen3-embedding-0.6b")
+MIN_IMAGE_BYTES = 1024
 
 # license_risk 等级映射，用于 license-policy 过滤
+# payload 实测值为 low/medium/high；同时兼容 *-risk 写法。
 LICENSE_LEVELS: dict[str, list[str]] = {
-    "low-risk": ["low-risk"],
-    "medium-risk": ["low-risk", "medium-risk"],
-    "high-risk": ["low-risk", "medium-risk", "high-risk"],
+    "low-risk": ["low", "low-risk"],
+    "medium-risk": ["low", "low-risk", "medium", "medium-risk"],
+    "high-risk": ["low", "low-risk", "medium", "medium-risk", "high", "high-risk"],
 }
 
 
@@ -70,20 +75,44 @@ def _http_post_json(url: str, body: dict, timeout: int = 30) -> Any:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def _embed_query(query: str) -> list[float]:
-    """调用本地 embedding 服务向量化 query"""
-    try:
-        resp = _http_post_json(
-            EMBEDDING_URL, {"text": query, "model": EMBEDDING_MODEL}
-        )
-    except (URLError, OSError) as e:
-        raise MediaBridgeError(
-            f"embedding 服务不可用 ({EMBEDDING_URL}): {type(e).__name__}: {e}"
-        )
+def _extract_vector(resp: Any) -> list[float] | None:
+    if not isinstance(resp, dict):
+        return None
     vec = resp.get("embedding") or resp.get("vector")
-    if not vec or not isinstance(vec, list):
-        raise MediaBridgeError(f"embedding 返回异常: {resp}")
-    return [float(v) for v in vec]
+    if isinstance(vec, list) and vec and isinstance(vec[0], (int, float)):
+        return [float(v) for v in vec]
+    data = resp.get("data")
+    if isinstance(data, list) and data:
+        inner = data[0].get("embedding") if isinstance(data[0], dict) else None
+        if isinstance(inner, list):
+            return [float(v) for v in inner]
+    embeddings = resp.get("embeddings")
+    if isinstance(embeddings, list) and embeddings:
+        first = embeddings[0]
+        if isinstance(first, list):
+            return [float(v) for v in first]
+    return None
+
+
+def _embed_query(query: str) -> list[float]:
+    """调用本地 18889 embedding；兼容 /embed 与 OpenAI /v1/embeddings。"""
+    errors: list[str] = []
+    for url, body in (
+        (EMBEDDING_URL, {"text": query, "model": EMBEDDING_MODEL}),
+        (EMBEDDING_OPENAI_URL, {"input": query, "model": EMBEDDING_MODEL}),
+    ):
+        try:
+            resp = _http_post_json(url, body, timeout=60)
+        except (URLError, OSError) as e:
+            errors.append(f"{url}: {type(e).__name__}: {e}")
+            continue
+        vec = _extract_vector(resp)
+        if vec:
+            return vec
+        errors.append(f"{url}: unexpected payload keys={list(resp)[:8] if isinstance(resp, dict) else type(resp).__name__}")
+    raise MediaBridgeError(
+        "embedding 服务不可用 (canonical 18889): " + " | ".join(errors)
+    )
 
 
 def _qdrant_search(
@@ -119,30 +148,48 @@ def cmd_search(args: argparse.Namespace) -> None:
     vector = _embed_query(args.query)
     hits = _qdrant_search(vector, args.top_k, license_filter)
 
-    # 只提取 payload schema 相关字段
     results: list[dict[str, Any]] = []
+    missing = 0
     for h in hits:
-        payload = h.get("payload", {})
+        payload = h.get("payload", {}) or {}
+        rel = payload.get("relative_path")
+        abs_path = (MEDIA_STOCK_ROOT / rel).resolve() if rel else None
+        exists = bool(abs_path and abs_path.is_file())
+        if not exists:
+            missing += 1
         results.append({
             "content_id": payload.get("content_id"),
-            "relative_path": payload.get("relative_path"),
+            "relative_path": rel,
+            "absolute_path": str(abs_path) if abs_path else None,
+            "file_exists": exists,
+            "file_bytes": abs_path.stat().st_size if exists else None,
             "license_risk": payload.get("license_risk"),
             "has_subtitle": payload.get("has_subtitle"),
             "ip_owner": payload.get("ip_owner"),
             "media_library_id": payload.get("media_library_id"),
             "downweight": payload.get("downweight"),
             "media_root_key": payload.get("media_root_key"),
+            "rerank_score": payload.get("rerank_score") or payload.get("rerank") or h.get("rerank_score"),
             "score": h.get("score"),
         })
+    exist_rate = (len(results) - missing) / len(results) if results else 0.0
+    status = "OK" if results and missing == 0 else "FAIL"
     _emit({
-        "status": "OK",
+        "status": status,
         "query": args.query,
         "collection": COLLECTION_NAME,
+        "embedding_url": EMBEDDING_URL,
         "top_k": args.top_k,
         "license_policy": args.license_policy,
         "match_count": len(results),
+        "file_exists_rate": round(exist_rate, 4),
+        "missing_files": missing,
         "results": results,
+        "second_index_written": False,
+        "reembedded": False,
     })
+    if status != "OK":
+        sys.exit(1)
 
 
 def cmd_resolve(args: argparse.Namespace) -> None:
@@ -220,9 +267,18 @@ def cmd_health(args: argparse.Namespace) -> None:
     # media stock 根目录
     media_ok = MEDIA_STOCK_ROOT.is_dir()
 
-    overall = "OK" if (healthz_ok and coll_ok and media_ok) else "DEGRADED"
+    embed_ok, embed_detail = False, ""
+    try:
+        status_code, body = _http_get("http://127.0.0.1:18889/health", timeout=3)
+        embed_ok = status_code == 200
+        embed_detail = body.strip()[:300]
+    except Exception as e:
+        embed_detail = f"{type(e).__name__}: {e}"
+
+    overall = "OK" if (healthz_ok and coll_ok and media_ok and embed_ok) else "FAIL"
     _emit({
         "status": overall,
+        "fail_closed": True,
         "qdrant": {
             "base_url": QDRANT_BASE_URL,
             "healthz_reachable": healthz_ok,
@@ -231,6 +287,14 @@ def cmd_health(args: argparse.Namespace) -> None:
             "collection_ok": coll_ok,
             "point_count": point_count,
             "coll_detail": coll_detail,
+            "expected_points": 14133,
+        },
+        "embedding": {
+            "url": EMBEDDING_URL,
+            "openai_url": EMBEDDING_OPENAI_URL,
+            "reachable": embed_ok,
+            "detail": embed_detail,
+            "canonical_port": 18889,
         },
         "media": {
             "stock_root": str(MEDIA_STOCK_ROOT),
@@ -238,6 +302,8 @@ def cmd_health(args: argparse.Namespace) -> None:
         },
         "checked_at": _utc_now(),
     })
+    if overall != "OK":
+        sys.exit(1)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -276,6 +342,8 @@ def main(argv: list[str] | None = None) -> int:
     except MediaBridgeError as e:
         _emit({"status": "ERROR", "error": str(e)})
         return 1
+    except SystemExit as e:
+        return int(e.code or 1)
     except Exception as e:
         _emit({"status": "ERROR", "error": f"{type(e).__name__}: {e}"})
         return 1

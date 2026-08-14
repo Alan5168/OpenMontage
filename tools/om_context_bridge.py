@@ -11,10 +11,13 @@ import argparse
 import hashlib
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.error import URLError
+from urllib.request import Request, urlopen
 
 # OpenViking context 根目录（content-studio workspace）
 CONTEXT_ROOT = Path(
@@ -35,10 +38,16 @@ SCOPE_DIRS: dict[str, str] = {
     "active-projects": "active-projects",
 }
 
-# Qdrant 健康检查端点（loopback-only）
-QDRANT_HEALTH_URL = os.environ.get(
-    "QDRANT_HEALTH_URL", "http://127.0.0.1:6333/healthz"
+# OpenViking 0.4.13 CLI / HTTP（loopback-only）
+OV_BIN = Path(
+    os.environ.get(
+        "OPENVIKING_CLI",
+        r"C:\ContentStudio\runtime\openviking-0.4.13\Scripts\ov.exe",
+    )
 )
+OV_HTTP = os.environ.get("OPENVIKING_HTTP", "http://127.0.0.1:1933")
+OV_ACCOUNT = os.environ.get("OPENVIKING_ACCOUNT", "content-studio")
+VIKING_SCOPE_URI = "viking://resources/content-studio/"
 
 VIKING_PREFIX = "viking://resources/content-studio/"
 
@@ -87,45 +96,135 @@ def _to_viking_uri(path: Path) -> str:
     return VIKING_PREFIX + path.relative_to(CONTEXT_ROOT).as_posix()
 
 
+def _http_ok(url: str, timeout: int = 3) -> tuple[bool, str]:
+    try:
+        req = Request(url, headers={"Accept": "application/json, text/plain"})
+        with urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", errors="ignore")[:500]
+            return 200 <= resp.status < 300, body.strip()
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
+
+
+def _ov_cli(args: list[str], timeout: int = 60) -> tuple[int, str, str]:
+    if not OV_BIN.is_file():
+        raise ContextBridgeError(f"OpenViking CLI 不存在: {OV_BIN}")
+    cmd = [str(OV_BIN), "-o", "json", "--account", OV_ACCOUNT, *args]
+    proc = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        encoding="utf-8",
+        errors="replace",
+    )
+    return proc.returncode, proc.stdout or "", proc.stderr or ""
+
+
+def _parse_ov_json(stdout: str) -> Any:
+    text = stdout.strip()
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        start_arr = text.find("[")
+        idx = min([i for i in (start, start_arr) if i >= 0], default=-1)
+        if idx < 0:
+            return {"raw": text[:2000]}
+        try:
+            return json.loads(text[idx:])
+        except json.JSONDecodeError:
+            return {"raw": text[:2000]}
+
+
 def cmd_search(args: argparse.Namespace) -> None:
-    """检索 OpenViking 资源目录（简单文本匹配，作为上下文候选）"""
-    query = args.query.lower()
-    scopes = [args.scope] if args.scope else list(SCOPE_DIRS.keys())
+    """真实调用 OpenViking 0.4.13 `ov find`，禁止用目录 grep 冒充。"""
+    ov_ok, ov_detail = _http_ok(f"{OV_HTTP}/health")
+    if not ov_ok:
+        _emit({
+            "status": "FAIL",
+            "error": "OpenViking HTTP 不可达，拒绝降级为本地 grep",
+            "health": ov_detail,
+            "http": OV_HTTP,
+        })
+        sys.exit(1)
+
+    uri = VIKING_SCOPE_URI
+    if args.scope:
+        sub = SCOPE_DIRS.get(args.scope)
+        if sub:
+            uri = f"{VIKING_PREFIX}{sub}/"
+    cli_args = ["find", args.query, "-u", uri, "-n", str(getattr(args, "top_k", 20) or 20)]
+    code, stdout, stderr = _ov_cli(cli_args)
+    parsed = _parse_ov_json(stdout)
+    if isinstance(parsed, dict) and isinstance(parsed.get("result"), dict) and parsed.get("ok") is True:
+        parsed = parsed["result"]
     results: list[dict[str, Any]] = []
-    for scope in scopes:
-        sub = SCOPE_DIRS.get(scope)
-        if not sub:
-            continue
-        base = CONTEXT_ROOT / sub
-        if not base.is_dir():
-            continue
-        for p in base.rglob("*"):
-            if not p.is_file():
-                continue
-            try:
-                text = p.read_text(encoding="utf-8", errors="ignore")
-            except OSError:
-                continue
-            haystack = (p.name + "\n" + text).lower()
-            if query in haystack:
+    if isinstance(parsed, dict):
+        raw_hits = (
+            parsed.get("resources")
+            or parsed.get("results")
+            or parsed.get("items")
+            or parsed.get("data")
+            or parsed.get("hits")
+            or []
+        )
+        if isinstance(raw_hits, dict):
+            raw_hits = raw_hits.get("items") or raw_hits.get("results") or []
+        if isinstance(raw_hits, list):
+            for hit in raw_hits:
+                if not isinstance(hit, dict):
+                    continue
                 results.append({
-                    "scope": scope,
-                    "viking_uri": _to_viking_uri(p),
-                    "relative_path": str(p.relative_to(CONTEXT_ROOT)),
-                    "name": p.name,
-                    "size": p.stat().st_size,
+                    "viking_uri": hit.get("uri") or hit.get("path") or hit.get("viking_uri"),
+                    "score": hit.get("score") or hit.get("relevance"),
+                    "level": hit.get("level"),
+                    "title": hit.get("title") or hit.get("name"),
+                    "snippet": hit.get("snippet") or hit.get("abstract") or hit.get("overview"),
+                    "source_pointer": hit.get("source") or hit.get("source_pointer") or hit.get("uri"),
                 })
+    trajectory = {
+        "backend": "openviking-0.4.13-cli",
+        "cli": str(OV_BIN),
+        "argv": cli_args,
+        "exit_code": code,
+        "stderr": stderr[-1000:],
+        "http": OV_HTTP,
+        "uri": uri,
+        "grep_fallback": False,
+    }
+    status = "OK" if code == 0 else "FAIL"
     _emit({
-        "status": "OK",
+        "status": status,
         "query": args.query,
         "scope": args.scope or "all",
         "match_count": len(results),
         "results": results,
+        "trajectory": trajectory,
+        "raw": parsed if not results else None,
+        "session_auto_commit": False,
     })
+    if status != "OK":
+        sys.exit(1)
 
 
 def cmd_read(args: argparse.Namespace) -> None:
-    """读取指定 viking:// 路径内容（只读）"""
+    """优先 ov read；失败才读本地 workspace 文件，并标明降级。"""
+    ov_ok, _ = _http_ok(f"{OV_HTTP}/health")
+    if ov_ok:
+        code, stdout, stderr = _ov_cli(["read", args.viking_uri])
+        parsed = _parse_ov_json(stdout)
+        if code == 0:
+            _emit({
+                "status": "OK",
+                "viking_uri": args.viking_uri,
+                "backend": "openviking-0.4.13-cli",
+                "content": parsed if parsed is not None else stdout,
+                "stderr": stderr[-500:],
+            })
+            return
     path = _resolve_viking_uri(args.viking_uri)
     if not path.exists():
         _emit({"status": "NOT_FOUND", "viking_uri": args.viking_uri})
@@ -135,18 +234,19 @@ def cmd_read(args: argparse.Namespace) -> None:
             "status": "OK",
             "viking_uri": args.viking_uri,
             "type": "directory",
+            "backend": "workspace-fallback",
             "entries": sorted(p.name for p in path.iterdir()),
         })
         return
     raw = path.read_bytes()
-    text = raw.decode("utf-8", errors="ignore")
     _emit({
         "status": "OK",
         "viking_uri": args.viking_uri,
         "type": "file",
+        "backend": "workspace-fallback",
         "sha256": _sha256_bytes(raw),
         "size": len(raw),
-        "content": text,
+        "content": raw.decode("utf-8", errors="ignore"),
     })
 
 
@@ -243,8 +343,7 @@ def cmd_promote_lesson(args: argparse.Namespace) -> None:
 
 
 def cmd_health(args: argparse.Namespace) -> None:
-    """OpenViking + Qdrant 健康检查"""
-    # OpenViking 目录结构检查
+    """OpenViking HTTP + CLI + Qdrant。DEGRADED/FAIL 一律非 0 退出。"""
     ov_ok = CONTEXT_ROOT.is_dir()
     missing_dirs: list[str] = []
     for name in ["governance", "openmontage", "research", "goodcases",
@@ -252,32 +351,46 @@ def cmd_health(args: argparse.Namespace) -> None:
         if not (CONTEXT_ROOT / name).is_dir():
             missing_dirs.append(name)
 
-    # Qdrant 健康检查（/healthz 返回纯文本）
-    qdrant_ok = False
-    qdrant_detail = "not_checked"
+    http_ok, http_detail = _http_ok(f"{OV_HTTP}/health")
+    cli_ok = False
+    cli_detail = "not_run"
     try:
-        import urllib.request
-        with urllib.request.urlopen(QDRANT_HEALTH_URL, timeout=3) as resp:
-            qdrant_ok = resp.status == 200
-            qdrant_detail = resp.read().decode("utf-8", errors="ignore").strip()
+        code, stdout, stderr = _ov_cli(["health"], timeout=20)
+        cli_ok = code == 0
+        cli_detail = (stdout or stderr)[:400]
     except Exception as e:
-        qdrant_detail = f"error: {type(e).__name__}: {e}"
+        cli_detail = f"{type(e).__name__}: {e}"
 
-    overall = "OK" if (ov_ok and not missing_dirs and qdrant_ok) else "DEGRADED"
+    qdrant_ok, qdrant_detail = _http_ok(
+        os.environ.get("QDRANT_HEALTH_URL", "http://127.0.0.1:6333/healthz")
+    )
+
+    overall = "OK" if (ov_ok and not missing_dirs and http_ok and cli_ok and qdrant_ok) else "FAIL"
     _emit({
         "status": overall,
+        "fail_closed": True,
         "openviking": {
+            "version_required": "0.4.13",
             "context_root": str(CONTEXT_ROOT),
             "root_exists": ov_ok,
             "missing_dirs": missing_dirs,
+            "http": OV_HTTP,
+            "http_ok": http_ok,
+            "http_detail": http_detail,
+            "cli": str(OV_BIN),
+            "cli_ok": cli_ok,
+            "cli_detail": cli_detail,
+            "session_auto_commit_default_enabled": False,
+            "grep_search_disabled": True,
         },
         "qdrant": {
-            "health_url": QDRANT_HEALTH_URL,
             "reachable": qdrant_ok,
             "detail": qdrant_detail,
         },
         "checked_at": _utc_now(),
     })
+    if overall != "OK":
+        sys.exit(1)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -292,6 +405,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument(
         "--scope", choices=list(SCOPE_DIRS.keys()), help="限定检索范围"
     )
+    sp.add_argument("--top-k", type=int, default=20, help="返回数量")
     sp.set_defaults(func=cmd_search)
 
     rp = sub.add_parser("read", help="读取指定 viking:// 路径内容")

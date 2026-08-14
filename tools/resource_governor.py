@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -32,6 +33,19 @@ CONTENT_STUDIO_ROOT = Path(r"C:\ContentStudio")
 WARN_THRESHOLD = 80  # 磁盘使用率告警阈值
 BLOCK_THRESHOLD = 90  # 磁盘使用率阻塞阈值
 GC_AGE_THRESHOLD_DAYS = 7  # GC 只回收超过此天数的文件
+QUARANTINE_ROOT = Path(
+    os.environ.get(
+        "CONTENT_STUDIO_QUARANTINE",
+        r"C:\ContentStudio\quarantine\gc",
+    )
+)
+PRESERVE_NAMES = {
+    "project.json",
+    "job_manifest.json",
+    "decision_log.json",
+    "LICENSE",
+    "license.json",
+}
 # GC 扫描的目标模式
 GC_SCAN_PATTERNS = [
     "working/review_packet",  # 过期的 review packet
@@ -178,14 +192,44 @@ def _scan_gc_candidates() -> list[dict[str, Any]]:
     return candidates
 
 
-def cmd_gc(execute: bool = False) -> dict[str, Any]:
-    """执行垃圾回收。
+def _quarantine_move(src: Path, reason: str) -> dict[str, Any]:
+    """Move to quarantine/trash with manifest; never unlink/rmtree production files."""
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    dest_root = QUARANTINE_ROOT / stamp
+    dest = dest_root / src.name
+    dest_root.mkdir(parents=True, exist_ok=True)
+    sha = ""
+    size = 0
+    if src.is_file():
+        size = src.stat().st_size
+        sha = hashlib.sha256(src.read_bytes()).hexdigest()
+        shutil.move(str(src), str(dest))
+    else:
+        size = _dir_size(src)
+        shutil.move(str(src), str(dest))
+    receipt = {
+        "source": str(src),
+        "quarantine_path": str(dest),
+        "reason": reason,
+        "sha256": sha,
+        "size_bytes": size,
+        "moved_at": _utc_now(),
+        "restore": {
+            "command": "resource_governor.py gc-restore --manifest <this>",
+            "destination": str(src),
+        },
+    }
+    (dest_root / "MANIFEST.json").write_text(
+        json.dumps(receipt, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return receipt
 
-    execute=False: dry-run，只扫描不删除。
-    execute=True:  只删除 dry-run 发现的且超过阈值的。
-    """
+
+def cmd_gc(execute: bool = False) -> dict[str, Any]:
+    """Quarantine GC. execute=False is dry-run. Never direct-delete."""
     candidates = _scan_gc_candidates()
-    deleted: list[dict[str, Any]] = []
+    quarantined: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     if execute:
         for cand in candidates:
@@ -194,34 +238,56 @@ def cmd_gc(execute: bool = False) -> dict[str, Any]:
                 continue
             path = Path(cand["path"])
             try:
-                if path.is_dir():
-                    shutil.rmtree(path)
-                elif path.is_file():
-                    path.unlink()
-                cand["deleted"] = True
-                deleted.append(cand)
+                receipt = _quarantine_move(path, f"gc:{cand['pattern']}")
+                cand["quarantined"] = True
+                cand["receipt"] = receipt
+                quarantined.append(cand)
             except OSError as exc:
-                cand["deleted"] = False
+                cand["quarantined"] = False
                 cand["error"] = str(exc)
                 skipped.append(cand)
     total_size = sum(c["size_bytes"] for c in candidates)
-    deleted_size = sum(c["size_bytes"] for c in deleted)
+    moved_size = sum(c["size_bytes"] for c in quarantined)
     return {
         "schema_version": SCHEMA_VERSION,
-        "mode": "EXECUTE" if execute else "DRY_RUN",
+        "mode": "EXECUTE_QUARANTINE" if execute else "DRY_RUN",
+        "direct_delete": False,
         "gc_candidates": candidates,
-        "deleted": deleted if execute else [],
+        "quarantined": quarantined if execute else [],
+        "deleted": [],
         "skipped": skipped if execute else [],
         "summary": {
             "candidate_count": len(candidates),
             "safe_to_delete_count": sum(1 for c in candidates if c["safe_to_delete"]),
-            "deleted_count": len(deleted),
+            "quarantined_count": len(quarantined),
             "skipped_count": len(skipped),
             "total_candidate_size_bytes": total_size,
-            "deleted_size_bytes": deleted_size,
+            "reclaimed_bytes": moved_size,
+            "bytes_generated": None,
+            "bytes_retained": None,
         },
         "gc_age_threshold_days": GC_AGE_THRESHOLD_DAYS,
+        "quarantine_root": str(QUARANTINE_ROOT),
         "scanned_at": _utc_now(),
+    }
+
+
+def cmd_gc_restore(manifest_path: str) -> dict[str, Any]:
+    path = Path(manifest_path)
+    receipt = _read_json(path)
+    src = Path(receipt["quarantine_path"])
+    dest = Path(receipt["restore"]["destination"])
+    if not src.exists():
+        raise GovernorError(f"quarantine 源不存在: {src}")
+    if dest.exists():
+        raise GovernorError(f"恢复目标已存在，拒绝覆盖: {dest}")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(src), str(dest))
+    return {
+        "status": "RESTORED",
+        "from": str(src),
+        "to": str(dest),
+        "restored_at": _utc_now(),
     }
 
 
@@ -341,7 +407,10 @@ def _parser() -> argparse.ArgumentParser:
     gc_parser = sub.add_parser("gc")
     gc_mode = gc_parser.add_mutually_exclusive_group(required=True)
     gc_mode.add_argument("--dry-run", action="store_true", help="只扫描不删除")
-    gc_mode.add_argument("--execute", action="store_true", help="执行垃圾回收")
+    gc_mode.add_argument("--execute", action="store_true", help="移入 quarantine（可恢复）")
+
+    restore = sub.add_parser("gc-restore")
+    restore.add_argument("--manifest", required=True, help="quarantine MANIFEST.json")
 
     # gpu-status
     sub.add_parser("gpu-status")
@@ -359,6 +428,8 @@ def main() -> int:
             result = cmd_disk_status()
         elif args.command == "gc":
             result = cmd_gc(execute=args.execute)
+        elif args.command == "gc-restore":
+            result = cmd_gc_restore(args.manifest)
         elif args.command == "gpu-status":
             result = cmd_gpu_status()
         elif args.command == "threshold-check":

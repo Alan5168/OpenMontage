@@ -211,9 +211,8 @@ def _copy_keyframes(
             shutil.copy2(source, target)
             sha256 = _sha256_file(target)
         else:
-            # 源文件不存在，创建占位文件
-            target.write_bytes(b"")
-            sha256 = ""
+            # 源文件不存在，拒绝空文件占位
+            raise PacketError(f"关键帧源文件不存在: {source}")
         images_manifest.append({
             "image_id": frame["cut_id"],
             "filename": frame["target_name"],
@@ -265,9 +264,7 @@ def _generate_contact_sheet(
     try:
         from PIL import Image, ImageDraw, ImageFont
     except ImportError:
-        # PIL 不可用，创建最小 JPEG 占位
-        output_path.write_bytes(b"\xff\xd8\xff\xd9")
-        return
+        raise PacketError("PIL/Pillow 未安装，拒绝写入 4-byte JPEG 占位")
 
     # 收集实际存在的图片
     thumbnails: list[tuple[str, Path | None]] = []

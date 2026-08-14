@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -312,6 +313,27 @@ def run_visual_qa(
     images_result: list[dict[str, Any]] = []
     prev_stat = None
     for img_path in image_files:
+        if img_path.stat().st_size <= 16 or img_path.read_bytes()[:4] == b"\xff\xd8\xff\xd9":
+            images_result.append({
+                "image_id": img_path.stem,
+                "path": str(img_path),
+                "image_hash": "",
+                "actually_viewed": False,
+                "bytes": img_path.stat().st_size,
+                "continuity": "FAIL",
+                "legibility": "FAIL",
+                "composition": "FAIL",
+                "style_match": "FAIL",
+                "defects": ["placeholder_or_tiny_file"],
+                "confidence": 1.0,
+                "human_review_required": True,
+                "continuity_notes": f"文件过小 ({img_path.stat().st_size} bytes)，拒绝占位图",
+                "style_notes": "placeholder",
+                "composition_notes": "placeholder",
+                "overall": "FAIL",
+                "action_required": "regenerate",
+            })
+            continue
         try:
             img, stat = _load_image(img_path)
         except QAError as exc:
@@ -339,11 +361,20 @@ def run_visual_qa(
         images_result.append({
             "image_id": img_path.stem,
             "path": str(img_path),
+            "image_hash": hashlib.sha256(img_path.read_bytes()).hexdigest(),
+            "actually_viewed": True,
+            "bytes": img_path.stat().st_size,
+            "width": img.size[0],
+            "height": img.size[1],
             "continuity": cont_verdict,
-            "continuity_notes": cont_notes,
-            "style_match": style_verdict,
-            "style_notes": style_notes,
+            "legibility": "UNCERTAIN",
             "composition": comp_verdict,
+            "style_match": style_verdict,
+            "defects": [] if overall == "PASS" else [cont_notes, style_notes, comp_notes],
+            "confidence": 0.55,
+            "human_review_required": True,
+            "continuity_notes": cont_notes,
+            "style_notes": style_notes,
             "composition_notes": comp_notes,
             "overall": overall,
             "action_required": action,

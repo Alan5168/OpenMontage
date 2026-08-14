@@ -198,16 +198,16 @@ def _spawn_worker_process(
 def cmd_submit_continuity_regen(
     project_id: str,
     delay_seconds: float = 30.0,
+    fixture: bool = False,
 ) -> dict[str, Any]:
     """提交连续性重新生成任务。
 
-    5秒内返回 ACCEPTED，后台启动 worker。
-    状态流: QUEUED -> RUNNING -> AWAITING_REVIEW | FAILED
+    fixture=True 才允许 delayed fake worker（T2 异步 ACK）。
+    生产路径必须走真实 continuity worker。
     """
     job_id = f"continuity-regen-{uuid.uuid4().hex[:12]}"
     status_path = _job_status_path(project_id, job_id)
 
-    # 初始状态: QUEUED
     initial_status = {
         "schema_version": "content-studio-async-console/v1",
         "job_id": job_id,
@@ -217,17 +217,21 @@ def cmd_submit_continuity_regen(
         "status_path": str(status_path),
         "created_at": _utc_now(),
         "delay_seconds": delay_seconds,
-        "provider": "fake",
+        "provider": "fixture_fake" if fixture else "sceneplan_continuity",
+        "fixture": fixture,
     }
     _write_job_status(project_id, job_id, initial_status)
 
-    # 立即转为 RUNNING
     initial_status["status"] = STATUS_RUNNING
     initial_status["started_at"] = _utc_now()
     _write_job_status(project_id, job_id, initial_status)
 
-    # 后台启动 worker（独立进程，确保进程退出后 worker 仍可运行）
-    _spawn_worker_process(project_id, job_id, delay_seconds)
+    if fixture:
+        _spawn_worker_process(project_id, job_id, delay_seconds)
+        production_started = False
+    else:
+        _spawn_real_continuity_worker(project_id, job_id)
+        production_started = True
 
     return {
         "status": "ACCEPTED",
@@ -235,8 +239,63 @@ def cmd_submit_continuity_regen(
         "project_id": project_id,
         "action": "continuity_regen",
         "status_path": str(status_path),
-        "production_started": False,
+        "production_started": production_started,
+        "fixture": fixture,
     }
+
+
+def _spawn_real_continuity_worker(project_id: str, job_id: str) -> None:
+    args = [
+        sys.executable,
+        "-X", "utf8",
+        __file__,
+        "--project-id", project_id,
+        "_real_worker",
+        "--job-id", job_id,
+    ]
+    creationflags = 0
+    if sys.platform == "win32":
+        creationflags = 0x00000008 | 0x00000200
+    subprocess.Popen(
+        args,
+        creationflags=creationflags,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def _real_continuity_worker(project_id: str, job_id: str) -> None:
+    """Production worker: evaluate existing VCP; do not invent images."""
+    last_error = ""
+    for attempt in range(1, MAX_WORKER_RETRIES + 1):
+        try:
+            from tools.sceneplan_continuity import evaluate_visual_continuity
+
+            project_dir = _job_dir(project_id)
+            artifact = project_dir / "artifacts" / "scene_plan.json"
+            if not artifact.is_file():
+                raise ConsoleError(f"scene_plan 不存在: {artifact}")
+            scene_plan = _read_json(artifact)
+            evaluation = evaluate_visual_continuity(scene_plan)
+            status = _read_job_status(project_id, job_id) or {}
+            status["status"] = STATUS_AWAITING_REVIEW
+            status["completed_at"] = _utc_now()
+            status["worker_trace"] = "sceneplan_continuity_evaluate"
+            status["worker_attempts"] = attempt
+            status["evaluation"] = evaluation
+            status["production_started"] = True
+            _write_job_status(project_id, job_id, status)
+            return
+        except Exception as exc:
+            last_error = str(exc)
+            if attempt < MAX_WORKER_RETRIES:
+                time.sleep(1.0)
+                continue
+    status = _read_job_status(project_id, job_id) or {}
+    status["status"] = STATUS_FAILED
+    status["error"] = f"real worker 重试 {MAX_WORKER_RETRIES} 次后失败: {last_error}"
+    status["failed_at"] = _utc_now()
+    _write_job_status(project_id, job_id, status)
 
 
 # ---------------------------------------------------------------------------
@@ -270,103 +329,15 @@ def cmd_job_status(project_id: str, job_id: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # 命令: build-review-packet
 # ---------------------------------------------------------------------------
-def _create_placeholder_jpeg(path: Path) -> None:
-    """创建 contact_sheet.jpg 占位文件（最小 JPEG: SOI + EOI）。"""
-    # FF D8 = SOI (Start Of Image), FF D9 = EOI (End Of Image)
-    path.write_bytes(b"\xff\xd8\xff\xd9")
-
-
-def _build_visual_qa_schema(project_id: str) -> dict[str, Any]:
-    """构建 VISUAL_QA.schema.json 内容。"""
-    return {
-        "schema_version": "visual-qa/v1",
-        "project_id": project_id,
-        "created_at": _utc_now(),
-        "checks": [
-            {
-                "id": "continuity",
-                "label": "视觉连续性",
-                "status": "pending",
-                "required": True,
-            },
-            {
-                "id": "composition",
-                "label": "构图一致性",
-                "status": "pending",
-                "required": True,
-            },
-            {
-                "id": "color_grading",
-                "label": "调色一致性",
-                "status": "pending",
-                "required": True,
-            },
-            {
-                "id": "character_consistency",
-                "label": "角色一致性",
-                "status": "pending",
-                "required": False,
-            },
-        ],
-        "overall_status": "pending",
-    }
-
-
 def cmd_build_review_packet(project_id: str) -> dict[str, Any]:
-    """构建 review_packet/ 目录。
+    """委托 review_packet_builder；禁止 0/4-byte placeholder。"""
+    from tools.review_packet_builder import build_review_packet
 
-    包含: contact_sheet.jpg 占位 + manifest.json + images/ + VISUAL_QA.schema.json
-    """
-    project_dir = _job_dir(project_id)
-    packet_dir = project_dir / "working" / "review_packet"
-    images_dir = packet_dir / "images"
-
-    # 创建目录结构
-    packet_dir.mkdir(parents=True, exist_ok=True)
-    images_dir.mkdir(parents=True, exist_ok=True)
-
-    # contact_sheet.jpg 占位文件
-    contact_sheet = packet_dir / "contact_sheet.jpg"
-    _create_placeholder_jpeg(contact_sheet)
-
-    # VISUAL_QA.schema.json
-    qa_schema = _build_visual_qa_schema(project_id)
-    qa_path = packet_dir / "VISUAL_QA.schema.json"
-    _atomic_write_json(qa_path, qa_schema)
-
-    # images/.gitkeep 占位
-    (images_dir / ".gitkeep").write_text("", encoding="utf-8")
-
-    # manifest.json
-    manifest = {
-        "schema_version": "content-studio-review-packet/v1",
-        "project_id": project_id,
-        "created_at": _utc_now(),
-        "contact_sheet": {
-            "path": "contact_sheet.jpg",
-            "sha256": _sha256_file(contact_sheet),
-            "type": "placeholder",
-        },
-        "images_dir": "images/",
-        "visual_qa_schema": "VISUAL_QA.schema.json",
-        "visual_qa_sha256": _sha256_file(qa_path),
-        "items": [],
-    }
-    manifest_path = packet_dir / "manifest.json"
-    _atomic_write_json(manifest_path, manifest)
-
-    return {
-        "status": "BUILT",
-        "project_id": project_id,
-        "packet_dir": str(packet_dir),
-        "files": {
-            "contact_sheet": str(contact_sheet),
-            "manifest": str(manifest_path),
-            "visual_qa_schema": str(qa_path),
-            "images_dir": str(images_dir),
-        },
-        "manifest_sha256": _sha256_file(manifest_path),
-    }
+    receipt = build_review_packet(project_id)
+    contact = Path(receipt["files"]["contact_sheet"])
+    if not contact.is_file() or contact.stat().st_size < 1024:
+        raise ConsoleError(f"contact sheet 过小或缺失，拒绝 placeholder: {contact}")
+    return receipt
 
 
 # ---------------------------------------------------------------------------
@@ -418,7 +389,12 @@ def _parser() -> argparse.ArgumentParser:
     regen_parser = sub.add_parser("submit-continuity-regen")
     regen_parser.add_argument(
         "--delay-seconds", type=float, default=30.0,
-        help="worker 延迟完成秒数（默认 30）",
+        help="fixture worker 延迟完成秒数（默认 30）",
+    )
+    regen_parser.add_argument(
+        "--fixture",
+        action="store_true",
+        help="仅 T2 异步 ACK 使用 fake delayed worker",
     )
 
     # job-status
@@ -435,6 +411,8 @@ def _parser() -> argparse.ArgumentParser:
     worker_parser = sub.add_parser("_worker")
     worker_parser.add_argument("--job-id", required=True)
     worker_parser.add_argument("--delay-seconds", type=float, default=30.0)
+    real_worker = sub.add_parser("_real_worker")
+    real_worker.add_argument("--job-id", required=True)
 
     return parser
 
@@ -443,7 +421,9 @@ def main() -> int:
     args = _parser().parse_args()
     try:
         if args.command == "submit-continuity-regen":
-            payload = cmd_submit_continuity_regen(args.project_id, args.delay_seconds)
+            payload = cmd_submit_continuity_regen(
+                args.project_id, args.delay_seconds, fixture=args.fixture
+            )
         elif args.command == "job-status":
             payload = cmd_job_status(args.project_id, args.job_id)
         elif args.command == "build-review-packet":
@@ -451,8 +431,10 @@ def main() -> int:
         elif args.command == "open-prime":
             payload = cmd_open_prime(args.project_id)
         elif args.command == "_worker":
-            # 隐藏子命令：运行 delayed worker，不输出 JSON
             _delayed_worker(args.project_id, args.job_id, args.delay_seconds)
+            return 0
+        elif args.command == "_real_worker":
+            _real_continuity_worker(args.project_id, args.job_id)
             return 0
         else:
             payload = {"status": "ERROR", "error": f"未知命令: {args.command}"}
