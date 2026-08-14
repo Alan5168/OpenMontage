@@ -443,6 +443,8 @@ def run_t13() -> dict[str, Any]:
     data = json.loads(receipt.read_text(encoding="utf-8"))
     if data.get("force_push"):
         return _fail("检测到 force push")
+    if data.get("used_mac_bundle") or data.get("windows_https_push") is False:
+        return _not_proven("Windows 已 commit，但 GitHub push 不是 Windows 自己完成", data=data)
     if not data.get("pushed"):
         return _fail("未 push")
     return _pass("Windows git receipt", data=data)
