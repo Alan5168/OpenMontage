@@ -116,9 +116,58 @@ stages:
     checkpoint_required: true
     human_approval_default: false
     success_criteria: [Output hash and media probe recorded, Final hash invalidates on any input hash change]
+  - name: visual_review
+    skill: pipelines/research-report-explainer/quality-director
+    required_artifacts_in: [render_report]
+    produces: [creative_intent_contract, frame_packet, editorial_critique]
+    tools_available: [video_analyzer]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Frames come from the actual mp4 including t=0 and script anchors
+      - Critique findings cite timestamps and frame ids against frozen intent
+      - Text-only render_success is rejected as SEE
+    success_criteria: [Schema-valid frame_packet with existing image files, Critique findings are timestamped]
+  - name: repair_plan
+    skill: pipelines/research-report-explainer/quality-director
+    required_artifacts_in: [editorial_critique, creative_intent_contract]
+    produces: [repair_plan]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Plan names failed segments only
+      - Scope is segment, not full-film rewrite
+      - Each item traces to a critique finding
+    success_criteria: [Schema-valid repair_plan]
+  - name: patch
+    skill: pipelines/research-report-explainer/quality-director
+    required_artifacts_in: [repair_plan]
+    produces: [patch_receipt]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Receipt records draft hash
+      - Patched segment list is non-empty
+      - Unrelated segments were not rewritten
+    success_criteria: [Schema-valid patch_receipt]
+  - name: rerender
+    skill: pipelines/research-report-explainer/edit-compose-director
+    required_artifacts_in: [patch_receipt, edit_decisions, asset_manifest, voice_timing]
+    produces: [render_report]
+    tools_available: [video_compose, audio_mixer, video_stitch]
+    checkpoint_required: true
+    human_approval_default: false
+    reentry: {of: compose, max_cycles: 1, required_cycle: true}
+    review_focus:
+      - Output hash differs from the draft compose hash
+      - Only failed segments were patched
+      - Machine gates re-run on the new hash
+    success_criteria: [after_sha256 differs from before_sha256]
   - name: independent_qa
     skill: pipelines/research-report-explainer/quality-director
-    required_artifacts_in: [render_report, scene_plan, voice_timing]
+    required_artifacts_in: [render_report, scene_plan, voice_timing, editorial_critique]
     produces: [final_review]
     tools_available: [video_analyzer]
     checkpoint_required: true

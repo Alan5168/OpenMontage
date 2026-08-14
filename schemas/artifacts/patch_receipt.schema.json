@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/patch_receipt",
+  "title": "Patch Receipt",
+  "description": "What actually changed before rerender. after_sha256 is filled by rerender.",
+  "type": "object",
+  "required": ["version", "before_sha256", "patched_segments"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "const": "patch-receipt/v0.1" },
+    "before_sha256": { "type": "string", "minLength": 64, "maxLength": 64 },
+    "after_sha256": { "type": "string", "minLength": 64, "maxLength": 64 },
+    "output_path": { "type": "string" },
+    "patched_segments": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    },
+    "method": { "type": "string" }
+  }
+}

@@ -35,6 +35,7 @@ required_skills:
   - pipelines/explainer/asset-director
   - pipelines/explainer/edit-director
   - pipelines/explainer/compose-director
+  - pipelines/explainer/creative-loop-director
   - pipelines/explainer/publish-director
   - meta/reviewer
   - meta/checkpoint-protocol
@@ -248,11 +249,94 @@ stages:
       - Schema-valid render_report with output paths
       - Output file exists and passes ffprobe validation
 
+  - name: visual_review
+    skill: pipelines/explainer/creative-loop-director
+    required_artifacts_in:
+      - render_report
+    optional_artifacts_in:
+      - script
+    produces:
+      - creative_intent_contract
+      - frame_packet
+      - editorial_critique
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Frames come from the actual mp4 including t=0 and script anchors
+      - Critique findings cite timestamps and frame ids against frozen intent
+      - Text-only render_success is rejected as SEE
+    success_criteria:
+      - Schema-valid frame_packet with existing image files
+      - Schema-valid editorial_critique with timestamped findings
+
+  - name: repair_plan
+    skill: pipelines/explainer/creative-loop-director
+    required_artifacts_in:
+      - editorial_critique
+      - creative_intent_contract
+    produces:
+      - repair_plan
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Plan names failed segments only
+      - Scope is segment, not full-film rewrite
+      - Each item traces to a critique finding
+    success_criteria:
+      - Schema-valid repair_plan with at least one segment item
+
+  - name: patch
+    skill: pipelines/explainer/creative-loop-director
+    required_artifacts_in:
+      - repair_plan
+    produces:
+      - patch_receipt
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Receipt records draft hash
+      - Patched segment list is non-empty
+      - Unrelated segments were not rewritten
+    success_criteria:
+      - Schema-valid patch_receipt with before_sha256
+
+  - name: rerender
+    skill: pipelines/explainer/compose-director
+    required_artifacts_in:
+      - patch_receipt
+      - edit_decisions
+      - asset_manifest
+    produces:
+      - render_report
+    required_tools:
+      - video_compose
+      - audio_mixer
+    tools_available:
+      - video_compose
+      - audio_mixer
+    checkpoint_required: true
+    human_approval_default: false
+    reentry:
+      of: compose
+      max_cycles: 1
+      required_cycle: true
+    review_focus:
+      - Output hash differs from the draft compose hash
+      - Only failed segments were patched
+      - Machine gates re-run on the new hash
+    success_criteria:
+      - Schema-valid render_report
+      - after_sha256 differs from before_sha256
+
   - name: publish
     skill: pipelines/explainer/publish-director
     required_artifacts_in:
       - render_report
       - final_review
+      - editorial_critique
     optional_artifacts_in:
       - proposal_packet
     produces:

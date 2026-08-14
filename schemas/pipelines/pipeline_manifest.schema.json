@@ -111,6 +111,23 @@
                 "review_focus": { "type": "array", "items": { "type": "string" } }
               }
             }
+          },
+          "reentry": {
+            "type": "object",
+            "description": "Explicit loop-engineering back-edge. Skill-text send-back is not a reentry.",
+            "required": ["of"],
+            "additionalProperties": false,
+            "properties": {
+              "of": {
+                "type": "string",
+                "description": "Stage this node re-enters (compose for a visual repair cycle)"
+              },
+              "max_cycles": { "type": "integer", "minimum": 1 },
+              "required_cycle": {
+                "type": "boolean",
+                "description": "When true, publish cannot complete unless this reentry ran"
+              }
+            }
           }
         },
         "additionalProperties": false

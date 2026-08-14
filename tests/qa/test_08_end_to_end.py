@@ -580,6 +580,123 @@ write_checkpoint(
 )
 
 # ===================================================================
+# Creative Loop v0.1: visual_review → repair_plan → patch → rerender
+# ===================================================================
+print("\n--- Creative loop ---")
+from hashlib import sha256 as _sha256
+
+_draft = Path(render_report["outputs"][0]["path"]) if render_report.get("outputs") else Path(OUT) / "missing.mp4"
+_before = _sha256(_draft.read_bytes()).hexdigest() if _draft.exists() else "a" * 64
+_png = ASSETS_DIR / "loop_frame.png"
+_png.parent.mkdir(parents=True, exist_ok=True)
+_png.write_bytes(bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+    "0000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082"
+))
+_frame_sha = _sha256(_png.read_bytes()).hexdigest()
+intent_contract = {
+    "version": "creative-intent/v0.1",
+    "source_render": str(_draft),
+    "segments": [{
+        "id": "hook",
+        "t_start": 0,
+        "t_end": 4,
+        "intent": "establish concrete conflict immediately",
+        "must_convey": "the demo must show a real problem in the first seconds",
+        "creative_freedom": "high",
+    }],
+}
+frame_packet = {
+    "version": "frame-packet/v0.1",
+    "source_mp4": str(_draft),
+    "source_sha256": _before,
+    "duration_seconds": 8,
+    "frames": [
+        {"id": "f00", "t": 0.0, "path": str(_png), "sha256": _frame_sha, "kind": "t0"},
+        {"id": "f01", "t": 4.0, "path": str(_png), "sha256": _frame_sha, "kind": "interval"},
+        {"id": "f02", "t": 8.0, "path": str(_png), "sha256": _frame_sha, "kind": "anchor"},
+    ],
+    "machine_checks": {
+        "probe_ok": True,
+        "black_frame": False,
+        "duration_seconds": 8,
+        "width": 1,
+        "height": 1,
+        "issues": [],
+    },
+}
+editorial_critique = {
+    "version": "editorial-critique/v0.1",
+    "source_sha256": _before,
+    "findings": [{
+        "t_start": 0,
+        "t_end": 4,
+        "frame_ids": ["f00"],
+        "intent_id": "hook",
+        "failure_class": "hook_too_abstract",
+        "evidence": "At 0.0s frame f00 is a holding card; narration has not stated the conflict.",
+        "why_it_fails_intent": "Frozen intent required a concrete problem in the first 4s.",
+    }],
+}
+for name, payload in (
+    ("creative_intent_contract", intent_contract),
+    ("frame_packet", frame_packet),
+    ("editorial_critique", editorial_critique),
+):
+    validate_artifact(name, payload)
+
+write_checkpoint(
+    PIPELINE_DIR, PROJECT_ID, "visual_review", "completed",
+    artifacts={
+        "creative_intent_contract": intent_contract,
+        "frame_packet": frame_packet,
+        "editorial_critique": editorial_critique,
+    },
+    pipeline_type="animated-explainer",
+)
+repair_plan = {
+    "version": "repair-plan/v0.1",
+    "items": [{
+        "t_start": 0,
+        "t_end": 4,
+        "action": "replace opening hold with conflict card",
+        "scope": "segment",
+    }],
+}
+validate_artifact("repair_plan", repair_plan)
+write_checkpoint(
+    PIPELINE_DIR, PROJECT_ID, "repair_plan", "completed",
+    artifacts={"repair_plan": repair_plan},
+    pipeline_type="animated-explainer",
+)
+patched = Path(OUT) / "e2e_rerender.mp4"
+if _draft.exists():
+    shutil.copy2(_draft, patched)
+    patched.write_bytes(_draft.read_bytes() + b"\x00")
+_after = _sha256(patched.read_bytes()).hexdigest() if patched.exists() else "b" * 64
+patch_receipt = {
+    "version": "patch-receipt/v0.1",
+    "before_sha256": _before,
+    "after_sha256": _after,
+    "output_path": str(patched),
+    "patched_segments": ["hook"],
+    "method": "e2e-fixture",
+}
+validate_artifact("patch_receipt", patch_receipt)
+write_checkpoint(
+    PIPELINE_DIR, PROJECT_ID, "patch", "completed",
+    artifacts={"patch_receipt": patch_receipt},
+    pipeline_type="animated-explainer",
+)
+rerender_report = dict(render_report)
+rerender_report["outputs"] = [dict(render_report["outputs"][0], path=str(patched))]
+write_checkpoint(
+    PIPELINE_DIR, PROJECT_ID, "rerender", "completed",
+    artifacts={"render_report": rerender_report},
+    pipeline_type="animated-explainer",
+)
+
+# ===================================================================
 # Stage 7: publish
 # ===================================================================
 print("\n--- Stage 7: publish ---")
@@ -625,9 +742,12 @@ write_checkpoint(
 # ===================================================================
 print("\n--- Final validation ---")
 
-E2E_STAGES = ["research", "proposal", "script", "scene_plan", "assets", "edit", "compose", "publish"]
-completed = get_completed_stages(PIPELINE_DIR, PROJECT_ID)
-check("All 8 stages completed", len(completed) == 8, f"completed={completed}")
+E2E_STAGES = [
+    "research", "proposal", "script", "scene_plan", "assets", "edit", "compose",
+    "visual_review", "repair_plan", "patch", "rerender", "publish",
+]
+completed = get_completed_stages(PIPELINE_DIR, PROJECT_ID, "animated-explainer")
+check("All 12 stages completed", len(completed) == 12, f"completed={completed}")
 check("Next stage is None (done)", get_next_stage(PIPELINE_DIR, PROJECT_ID, "animated-explainer") is None)
 check("Stages in correct order", completed == E2E_STAGES, f"{completed}")
 

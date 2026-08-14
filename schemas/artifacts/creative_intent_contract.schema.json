@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/creative_intent_contract",
+  "title": "Creative Intent Contract",
+  "description": "Frozen per-segment intent. Describes the goal, not the solution. additionalProperties is false so this cannot grow into a skill checklist.",
+  "type": "object",
+  "required": ["version", "source_render", "segments"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "const": "creative-intent/v0.1" },
+    "source_render": { "type": "string" },
+    "segments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "t_start", "t_end", "intent", "must_convey", "creative_freedom"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "t_start": { "type": "number", "minimum": 0 },
+          "t_end": { "type": "number", "minimum": 0 },
+          "intent": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "must_convey": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "creative_freedom": { "type": "string", "enum": ["high", "medium", "low"] }
+        }
+      }
+    }
+  }
+}

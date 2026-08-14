@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/frame_packet",
+  "title": "Frame Packet",
+  "description": "Actual visual input extracted from the rendered mp4. render_success=true is not SEE.",
+  "type": "object",
+  "required": ["version", "source_mp4", "source_sha256", "frames", "machine_checks"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "const": "frame-packet/v0.1" },
+    "source_mp4": { "type": "string" },
+    "source_sha256": { "type": "string", "minLength": 64, "maxLength": 64 },
+    "duration_seconds": { "type": "number" },
+    "frames": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["id", "t", "path", "sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "t": { "type": "number", "minimum": 0 },
+          "path": { "type": "string" },
+          "sha256": { "type": "string", "minLength": 64, "maxLength": 64 },
+          "kind": { "type": "string", "enum": ["t0", "interval", "anchor"] }
+        }
+      }
+    },
+    "machine_checks": {
+      "type": "object",
+      "required": ["probe_ok", "black_frame", "duration_seconds"],
+      "additionalProperties": false,
+      "properties": {
+        "probe_ok": { "type": "boolean" },
+        "black_frame": { "type": "boolean" },
+        "duration_seconds": { "type": "number" },
+        "width": { "type": "integer" },
+        "height": { "type": "integer" },
+        "issues": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

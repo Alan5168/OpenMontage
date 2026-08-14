@@ -36,6 +36,12 @@ ARTIFACT_NAMES = [
     "voice_timing",
     "visual_development",
     "final_gate",
+    "creative_intent_contract",
+    "frame_packet",
+    "editorial_critique",
+    "repair_plan",
+    "patch_receipt",
+    "learning_event",
 ]
 
 

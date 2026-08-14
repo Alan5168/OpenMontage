@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/learning_event",
+  "title": "Learning Event",
+  "description": "Experience land-to-casebook. v0.1 records only; auto_retrieve is false and must stay false.",
+  "type": "object",
+  "required": [
+    "version",
+    "artifact",
+    "failure_observed",
+    "evidence",
+    "failure_class",
+    "constraint_class",
+    "repair",
+    "result",
+    "human_accept",
+    "applies_when",
+    "counterexample",
+    "auto_retrieve"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "const": "learning-event/v0.1" },
+    "artifact": { "type": "string" },
+    "failure_observed": { "type": "string" },
+    "evidence": { "type": "string" },
+    "failure_class": { "type": "string" },
+    "constraint_class": { "type": "string", "enum": ["hard", "prior", "explore"] },
+    "repair": { "type": "string" },
+    "result": { "type": "string" },
+    "human_accept": {
+      "oneOf": [
+        { "type": "boolean" },
+        { "type": "string", "enum": ["pending"] }
+      ]
+    },
+    "human_reason": { "type": "string" },
+    "applies_when": { "type": "string" },
+    "counterexample": { "type": "string" },
+    "auto_retrieve": { "type": "boolean", "const": false }
+  }
+}
