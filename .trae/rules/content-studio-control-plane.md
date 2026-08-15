@@ -8,7 +8,7 @@
 - 没有 Alan 的明确 cut decisions，不得 approve。
 - 看图必须实际打开图片；禁止只读 prompt / JSON 后声称看过。
 - 不调用 H3 / render / publish，除非 Alan 在该次任务明确授权。
-- 没有过审静帧的 cut 停在 planning；不得调用 video_selector / H3 / compose。
+- 没有过审源静帧的 cut 不得昂贵生成。不把每镜创意先交给 Alan 批。
 - 不读取、不输出 key / token / auth。禁止接 MCP。
 - 同一问题失败三次即停，报告 root cause，不做第四次猜测。
 - 结束写 receipt。不自动扩充本规则。

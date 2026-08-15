@@ -368,19 +368,19 @@ def lock_visuals(
     project_id: str | None,
     *,
     master_sheet: Path,
-    animatic: Path,
     i_am_human: bool,
+    animatic: Path | None = None,
 ) -> dict[str, Any]:
-    """Human job lock. Does not approve cuts or enable H3."""
+    """Human identity lock. Does not approve cuts, freeze camera, or enable H3."""
     from lib.shot_production_gate import evaluate_plan
 
     if not i_am_human:
         raise GatewayError("lock-visuals is human-only; pass --i-am-human")
     sheet = Path(master_sheet).expanduser()
-    reel = Path(animatic).expanduser()
     if not sheet.is_file():
         raise GatewayError(f"master sheet missing: {sheet}")
-    if not reel.is_file():
+    reel = Path(animatic).expanduser() if animatic else None
+    if reel is not None and not reel.is_file():
         raise GatewayError(f"animatic missing: {reel}")
 
     project = resolve_project(projects_dir, project_id)
@@ -393,8 +393,9 @@ def lock_visuals(
         raise GatewayError("scene_plan.metadata must be an object")
     meta["master_sheet_path"] = str(sheet.resolve())
     meta["master_sheet_locked"] = True
-    meta["animatic_path"] = str(reel.resolve())
-    meta["animatic_locked"] = True
+    if reel is not None:
+        meta["animatic_path"] = str(reel.resolve())
+        meta["animatic_locked"] = True
 
     old_bytes = artifact_path.read_bytes()
     next_artifacts = copy.deepcopy(checkpoint.get("artifacts") or {})
@@ -405,7 +406,8 @@ def lock_visuals(
         "locked_by": "human",
         "timestamp": _utc_now(),
         "master_sheet_path": meta["master_sheet_path"],
-        "animatic_path": meta["animatic_path"],
+        "animatic_path": meta.get("animatic_path"),
+        "locks": "identity",
     }
     try:
         _atomic_write_json(artifact_path, scene_plan)
@@ -435,12 +437,12 @@ def lock_visuals(
         "status": "JOB_VISUALS_LOCKED",
         "project_id": project["project_id"],
         "master_sheet_path": meta["master_sheet_path"],
-        "animatic_path": meta["animatic_path"],
+        "animatic_path": meta.get("animatic_path"),
         "job_blockers": overview["job_blockers"],
         "dispatchable_cut_ids": overview["dispatchable_cut_ids"],
         "planning_cut_ids": overview["planning_cut_ids"],
         "render_allowed": overview["render_allowed"],
-        "note": "Job locks recorded. Cuts stay in planning until approved stills exist.",
+        "note": "Identity locked. Cuts still need an approved source still; camera/motion stay open until SEE.",
     }
 
 
@@ -884,7 +886,7 @@ def _parser() -> argparse.ArgumentParser:
     sub.add_parser("board")
     lock_parser = sub.add_parser("lock-visuals")
     lock_parser.add_argument("--master-sheet", type=Path, required=True)
-    lock_parser.add_argument("--animatic", type=Path, required=True)
+    lock_parser.add_argument("--animatic", type=Path, required=False)
     lock_parser.add_argument("--i-am-human", action="store_true")
     apply_parser = sub.add_parser("apply-sceneplan")
     apply_parser.add_argument("--expected-checkpoint-sha256", required=True)

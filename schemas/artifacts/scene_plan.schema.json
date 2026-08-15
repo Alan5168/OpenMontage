@@ -53,7 +53,7 @@
           "animation_class": {
             "type": "string",
             "enum": ["LIMITED", "I2V_STANDARD", "I2V_HARD"],
-            "description": "Planned motion class. Dispatch to local_compose / video_model / H3 is illegal until lib/shot_production_gate reports production_ready."
+            "description": "Planned motion class. Optional. Missing class drafts as LIMITED after the minimum visual contract. I2V_HARD must be explicit. Dispatch is illegal until lib/shot_production_gate reports production_ready."
           },
           "character_ids": {
             "type": "array",
@@ -72,7 +72,7 @@
           "end_frame_ref": {
             "type": "string",
             "minLength": 1,
-            "description": "Approved still or next-cut frame used as the end frame"
+            "description": "Optional end still. Not part of the minimum visual contract; LIMITED drafts may omit it."
           },
           "primary_model": { "type": "string", "minLength": 1 },
           "fallback_models": {
@@ -247,7 +247,7 @@
     },
     "metadata": {
       "type": "object",
-      "description": "Job metadata. Limited Anime Studio visual locks: master_sheet_path, animatic_path, master_sheet_locked, animatic_locked. render_allowed is derived by lib/shot_production_gate; a stored true cannot bypass missing stills."
+      "description": "Job metadata. Limited Anime Studio identity lock: master_sheet_path / master_sheet_locked. Animatic is optional. render_allowed is derived by the minimum visual contract; a stored true cannot bypass missing stills."
     },
     "visual_continuity_package": {
       "type": "object",

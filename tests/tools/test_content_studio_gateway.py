@@ -499,22 +499,18 @@ def test_vid3_board_stays_in_planning(tmp_path: Path):
 def test_lock_visuals_requires_human_and_does_not_dispatch_cuts(tmp_path: Path):
     projects, project_dir = _vid3_projects(tmp_path)
     sheet = project_dir / "master_sheet.png"
-    animatic = project_dir / "animatic.mp4"
     sheet.write_bytes(b"sheet")
-    animatic.write_bytes(b"animatic")
     with pytest.raises(GatewayError, match="human-only"):
         lock_visuals(
             projects,
             "vid3-blacklisted-chef-90s-v1",
             master_sheet=sheet,
-            animatic=animatic,
             i_am_human=False,
         )
     payload = lock_visuals(
         projects,
         "vid3-blacklisted-chef-90s-v1",
         master_sheet=sheet,
-        animatic=animatic,
         i_am_human=True,
     )
     assert payload["status"] == "JOB_VISUALS_LOCKED"
@@ -523,6 +519,5 @@ def test_lock_visuals_requires_human_and_does_not_dispatch_cuts(tmp_path: Path):
     assert "c001" in payload["planning_cut_ids"]
     board = board_payload(projects, "vid3-blacklisted-chef-90s-v1")
     assert "master_sheet_unlocked" not in board["motion"]["job_blockers"]
-    assert "animatic_unlocked" not in board["motion"]["job_blockers"]
     assert board["motion"]["cuts"][0]["department"] == "planning"
 

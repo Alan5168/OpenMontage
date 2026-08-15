@@ -70,20 +70,22 @@ def route_cut(
     """Return the legal department for one cut, or planning if unconstrained."""
     planned = str(scene.get("animation_class") or "").strip().upper() or None
     if planned is not None:
-        cls = animation_class_of(scene)
-        requested = str(scene.get("primary_model") or scene.get("motion_route") or "")
-        if cls != "I2V_HARD" and _looks_like_h3(requested):
-            raise MotionRouterError(
-                f"cut {scene.get('id')!r} is {cls}; H3 is not on this edge"
-            )
+        animation_class_of(scene)
     root = Path(project_dir) if project_dir is not None else None
     gate = evaluate_cut(scene, scene_plan=scene_plan, project_dir=root)
+    requested = str(scene.get("primary_model") or scene.get("motion_route") or "")
+    dispatch_class = gate.get("dispatch_class") or planned
+    if dispatch_class != "I2V_HARD" and _looks_like_h3(requested):
+        raise MotionRouterError(
+            f"cut {scene.get('id')!r} is {dispatch_class or 'LIMITED'}; H3 is not on this edge"
+        )
     if not gate["production_ready"]:
         return {
             "cut_id": scene.get("id"),
             "animation_class": planned,
             "planned_class": planned,
-            "department": PLANNING if planned else UNCLASSIFIED,
+            "dispatch_class": None,
+            "department": PLANNING if (planned or gate["applies"]) else UNCLASSIFIED,
             "h3_allowed": False,
             "equipment": [],
             "generation_status": scene.get("generation_status") or "pending",
@@ -91,11 +93,12 @@ def route_cut(
             "production_ready": False,
             "blockers": gate["blockers"],
         }
-    department, equipment, h3_allowed = department_for_class(planned)
+    department, equipment, h3_allowed = department_for_class(dispatch_class)
     return {
         "cut_id": scene.get("id"),
-        "animation_class": planned,
+        "animation_class": dispatch_class,
         "planned_class": planned,
+        "dispatch_class": dispatch_class,
         "department": department,
         "h3_allowed": h3_allowed,
         "equipment": equipment,
@@ -143,8 +146,8 @@ def summarize_scenes(
         planned = row.get("planned_class")
         if planned in planned_counts:
             planned_counts[planned] += 1
-        if row.get("production_ready") and planned in dispatch_counts:
-            dispatch_counts[planned] += 1
+        if row.get("production_ready") and row.get("dispatch_class") in dispatch_counts:
+            dispatch_counts[row["dispatch_class"]] += 1
     root = Path(project_dir) if project_dir is not None else None
     overview = evaluate_plan(plan, root)
     return {

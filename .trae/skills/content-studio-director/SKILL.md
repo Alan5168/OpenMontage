@@ -54,10 +54,10 @@ python tools/content_studio_gateway.py --project-id <id> apply-sceneplan --expec
 
 `decisions-json` 只能是 Alan 给出的 keep/change/merge/omit。Agent 不得代批。
 
-人锁 master sheet / animatic（不批准 cut，也不开 H3）：
+人锁 identity（master sheet；不批准每镜，不开 H3）：
 
 ```text
-python tools/content_studio_gateway.py --project-id <id> lock-visuals --i-am-human --master-sheet <png> --animatic <file>
+python tools/content_studio_gateway.py --project-id <id> lock-visuals --i-am-human --master-sheet <png>
 ```
 
 ## Direct Prime（T5）

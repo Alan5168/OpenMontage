@@ -21,7 +21,7 @@ metadata:
   lifecycle_owner: OpenMontage
   human_touchpoints: [script, scene_plan, visual_review, final_gate]
   limited_anime_studio: true
-  visual_constraint_gate: master_sheet + animatic + approved_stills + shot_ready
+  visual_constraint_gate: minimum_visual_contract
   archaeology_source: clean_room_reconstruction_not_directory_copy
 stages:
   - {name: commission, skill: pipelines/anime-hybrid/executive-producer, produces: [brief], tools_available: [], checkpoint_required: true, human_approval_default: false}

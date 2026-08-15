@@ -1,9 +1,10 @@
-"""Fail-closed visual-constraint gate for the Limited Anime Studio.
+"""Minimum Visual Contract — L0 producibility gate.
 
-A cut cannot leave planning — and cannot reach video_selector / H3 /
-video_compose — until the job has a locked master sheet + animatic and
-the cut itself has approved stills on disk. Stored `render_allowed: true`
-cannot bypass missing files. No new pipeline.
+Locks identity and assets, not every creative choice. A cut may draft once
+the job has a locked master sheet and the cut has an approved source still
+on disk. Animatic, end frames, camera push/pull, motion amount, and
+metaphor stay open until SEE. Stored `render_allowed: true` cannot bypass
+missing files. No new pipeline.
 """
 
 from __future__ import annotations
@@ -13,28 +14,26 @@ from typing import Any
 
 PLANNING = "planning"
 UNCLASSIFIED = "unclassified"
+DEFAULT_DISPATCH_CLASS = "LIMITED"
 
 LIMITED_ANIME_PIPELINES = frozenset({"anime-hybrid"})
 LIMITED_ANIME_PROFILES = frozenset({"fiction_anime_episode"})
 
 MASTER_SHEET_UNLOCKED = "master_sheet_unlocked"
 MASTER_SHEET_MISSING = "master_sheet_file_missing"
-ANIMATIC_UNLOCKED = "animatic_unlocked"
 ANIMATIC_MISSING = "animatic_file_missing"
 PLACEHOLDER_REF = "visual_ref_placeholder"
 VISUAL_REF_NOT_LOCAL = "visual_ref_not_local_image"
 START_STILL_MISSING = "approved_start_still_missing"
-END_STILL_MISSING = "approved_end_still_missing"
 CHARACTER_IDS_MISSING = "character_ids_missing"
-ANIMATION_CLASS_MISSING = "animation_class_missing"
 
 
 class ShotGateError(ValueError):
-    """Cut is still in planning; motion/render is illegal."""
+    """Minimum visual contract failed; expensive motion/render is illegal."""
 
 
 def gate_applies(scene_plan: dict[str, Any] | None, scenes: list[Any] | None = None) -> bool:
-    """True when this plan is on the Limited Anime Studio path."""
+    """True when this plan is on the current Limited Anime production profile."""
     plan = scene_plan if isinstance(scene_plan, dict) else {}
     meta = plan.get("metadata") if isinstance(plan.get("metadata"), dict) else {}
     rows = scenes if scenes is not None else plan.get("scenes") or []
@@ -67,6 +66,7 @@ def resolve_media_path(project_dir: Path | None, ref: str | None) -> Path | None
 
 
 def job_blockers(scene_plan: dict[str, Any] | None, project_dir: Path | None = None) -> list[str]:
+    """Human-locked identity. Animatic is optional; if named, the file must exist."""
     plan = scene_plan if isinstance(scene_plan, dict) else {}
     meta = plan.get("metadata") if isinstance(plan.get("metadata"), dict) else {}
     blockers: list[str] = []
@@ -76,10 +76,8 @@ def job_blockers(scene_plan: dict[str, Any] | None, project_dir: Path | None = N
     elif resolve_media_path(project_dir, sheet) is None:
         blockers.append(MASTER_SHEET_MISSING if sheet else MASTER_SHEET_UNLOCKED)
     animatic = meta.get("animatic_path")
-    if not _locked(meta.get("animatic_locked")) and not animatic:
-        blockers.append(ANIMATIC_UNLOCKED)
-    elif resolve_media_path(project_dir, animatic) is None:
-        blockers.append(ANIMATIC_MISSING if animatic else ANIMATIC_UNLOCKED)
+    if animatic and resolve_media_path(project_dir, animatic) is None:
+        blockers.append(ANIMATIC_MISSING)
     return blockers
 
 
@@ -104,10 +102,12 @@ def evaluate_cut(
             if item not in seen:
                 seen.add(item)
                 ordered.append(item)
-    production_ready = applies and planned_class is not None and not ordered
+    production_ready = applies and not ordered
+    dispatch_class = planned_class or (DEFAULT_DISPATCH_CLASS if production_ready else None)
     return {
         "cut_id": cut_id,
         "planned_class": planned_class,
+        "dispatch_class": dispatch_class if production_ready else None,
         "production_ready": production_ready,
         "blockers": ordered,
         "applies": applies,
@@ -126,9 +126,13 @@ def evaluate_plan(scene_plan: dict[str, Any] | None, project_dir: Path | None = 
     planning = [
         row["cut_id"]
         for row in cuts
-        if row["planned_class"] and not row["production_ready"]
+        if (row["planned_class"] or row["applies"]) and not row["production_ready"]
     ]
-    unclassified = [row["cut_id"] for row in cuts if not row["planned_class"]]
+    unclassified = [
+        row["cut_id"]
+        for row in cuts
+        if not row["planned_class"] and not row["applies"]
+    ]
     return {
         "applies": gate_applies(plan, scenes),
         "job_blockers": job,
@@ -137,6 +141,7 @@ def evaluate_plan(scene_plan: dict[str, Any] | None, project_dir: Path | None = 
         "planning_cut_ids": planning,
         "unclassified_cut_ids": unclassified,
         "render_allowed": bool(dispatchable),
+        "contract": "minimum_visual_contract",
     }
 
 
@@ -146,7 +151,7 @@ def assert_dispatch(
     project_dir: Path | None = None,
     cut_ids: list[str] | None = None,
 ) -> None:
-    """Raise if the named cuts (or every non-omitted cut) cannot leave planning."""
+    """Raise if the named cuts (or every non-omitted cut) fail the minimum contract."""
     if not gate_applies(scene_plan):
         return
     scenes = [row for row in (scene_plan.get("scenes") or []) if isinstance(row, dict)]
@@ -165,17 +170,17 @@ def assert_dispatch(
         if row["production_ready"]:
             continue
         label = row["cut_id"] or "?"
-        detail = ",".join(row["blockers"] or [ANIMATION_CLASS_MISSING])
+        detail = ",".join(row["blockers"] or ["minimum_visual_contract"])
         lines.append(f"{label}:{detail}")
     if lines:
         raise ShotGateError(
-            "visual-constraint gate blocked dispatch — shot stays in planning: "
+            "visual-constraint gate blocked dispatch — minimum contract not met: "
             + "; ".join(lines)
         )
 
 
 def motion_dispatch_error(inputs: dict[str, Any], *, cut_ids: list[str] | None = None) -> str | None:
-    """Tool-facing helper. None means the caller may proceed."""
+    """Tool-facing helper. None means the caller may proceed to draft/render."""
     plan = _coerce_plan(inputs.get("scene_plan"))
     project_dir = _project_dir_from(inputs)
     requested_cut = inputs.get("cut_id")
@@ -192,7 +197,28 @@ def motion_dispatch_error(inputs: dict[str, Any], *, cut_ids: list[str] | None =
         assert_dispatch(plan, project_dir=project_dir, cut_ids=ids)
     except ShotGateError as exc:
         return str(exc)
-    return None
+    return _overlay_l0_error(inputs, plan)
+
+
+def _overlay_l0_error(inputs: dict[str, Any], plan: dict[str, Any]) -> str | None:
+    """L0 text/safe-area linter before expensive I2V/H3. Compose still re-runs it."""
+    edit_decisions = inputs.get("edit_decisions")
+    if not isinstance(edit_decisions, dict):
+        return None
+    overlays = edit_decisions.get("overlays") or []
+    meta_overlays = (edit_decisions.get("metadata") or {}).get("text_overlays") or []
+    overlay_cuts = [
+        cut for cut in (edit_decisions.get("cuts") or [])
+        if isinstance(cut, dict) and (cut.get("text") or cut.get("title"))
+    ]
+    if not overlays and not meta_overlays and not overlay_cuts:
+        return None
+    from lib.overlay_preflight import format_block_error, run_overlay_preflight
+
+    report = run_overlay_preflight(edit_decisions, plan)
+    if report.get("ok"):
+        return None
+    return format_block_error(report)
 
 
 def _coerce_plan(raw: Any) -> dict[str, Any] | None:
@@ -217,9 +243,6 @@ def _locked(value: Any) -> bool:
 
 def _cut_blockers(scene: dict[str, Any], project_dir: Path | None) -> list[str]:
     blockers: list[str] = []
-    planned = str(scene.get("animation_class") or "").strip()
-    if not planned:
-        blockers.append(ANIMATION_CLASS_MISSING)
     visual = scene.get("visual_ref") if isinstance(scene.get("visual_ref"), dict) else {}
     kind = str(visual.get("kind") or "").strip().lower()
     if kind in {"", "placeholder"}:
@@ -229,11 +252,6 @@ def _cut_blockers(scene: dict[str, Any], project_dir: Path | None) -> list[str]:
     start_ref = scene.get("start_frame_ref") or visual.get("path")
     if resolve_media_path(project_dir, start_ref) is None:
         blockers.append(START_STILL_MISSING)
-    planned_class = planned.upper()
-    if planned_class == "LIMITED":
-        end_ref = scene.get("end_frame_ref")
-        if resolve_media_path(project_dir, end_ref) is None:
-            blockers.append(END_STILL_MISSING)
     if scene.get("type") == "character_scene":
         ids = scene.get("character_ids")
         if not isinstance(ids, list) or not [item for item in ids if str(item).strip()]:

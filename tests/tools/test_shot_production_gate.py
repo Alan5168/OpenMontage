@@ -22,26 +22,22 @@ def _vid3_plan() -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _ready_plan(tmp_path: Path, animation_class: str = "LIMITED") -> dict:
+def _ready_plan(tmp_path: Path, animation_class: str | None = "LIMITED") -> dict:
     sheet = _touch(tmp_path / "locks" / "master_sheet.png")
-    animatic = _touch(tmp_path / "locks" / "animatic.mp4")
     start = _touch(tmp_path / "bible" / "jesse" / "approved" / "idle.png")
-    end = _touch(tmp_path / "bible" / "jesse" / "approved" / "note.png")
     scene = {
         "id": "c001",
         "type": "character_scene",
         "description": "Jesse holds the note.",
         "start_seconds": 0,
         "end_seconds": 3,
-        "animation_class": animation_class,
         "character_ids": ["jesse"],
         "start_frame_ref": str(start),
-        "end_frame_ref": str(end),
         "visual_ref": {"kind": "local_image", "path": str(start)},
         "generation_status": "pending",
     }
-    if animation_class != "LIMITED":
-        scene.pop("end_frame_ref")
+    if animation_class:
+        scene["animation_class"] = animation_class
     return {
         "version": "1.0",
         "style_playbook": "anime-ghibli",
@@ -51,8 +47,6 @@ def _ready_plan(tmp_path: Path, animation_class: str = "LIMITED") -> dict:
             "profile": "fiction_anime_episode",
             "master_sheet_path": str(sheet),
             "master_sheet_locked": True,
-            "animatic_path": str(animatic),
-            "animatic_locked": True,
         },
     }
 
@@ -69,7 +63,7 @@ def test_vid3_fixture_cannot_leave_planning():
     assert row["h3_allowed"] is False
     assert row["production_ready"] is False
     assert "visual_ref_placeholder" in row["blockers"]
-    with pytest.raises(ShotGateError, match="planning"):
+    with pytest.raises(ShotGateError, match="visual-constraint"):
         assert_dispatch(plan)
     assert motion_dispatch_error({"scene_plan": plan, "cut_id": "c001"})
 
@@ -148,3 +142,46 @@ def test_video_compose_blocks_vid3():
     )
     assert result.success is False
     assert "visual-constraint" in (result.error or "")
+
+
+def test_minimum_contract_allows_limited_draft_without_end_frame_or_animatic(tmp_path: Path):
+    plan = _ready_plan(tmp_path, "LIMITED")
+    assert "end_frame_ref" not in plan["scenes"][0]
+    assert "animatic_path" not in plan["metadata"]
+    row = route_cut(plan["scenes"][0], scene_plan=plan, project_dir=tmp_path)
+    assert row["department"] == "local_compose"
+    assert row["production_ready"] is True
+
+
+def test_missing_class_drafts_as_limited_after_identity_lock(tmp_path: Path):
+    plan = _ready_plan(tmp_path, None)
+    row = route_cut(plan["scenes"][0], scene_plan=plan, project_dir=tmp_path)
+    assert row["dispatch_class"] == "LIMITED"
+    assert row["department"] == "local_compose"
+    assert row["h3_allowed"] is False
+
+
+def test_overlay_l0_blocks_motion_after_identity_lock(tmp_path: Path):
+    plan = _ready_plan(tmp_path, "I2V_STANDARD")
+    error = motion_dispatch_error(
+        {
+            "scene_plan": plan,
+            "cut_id": "c001",
+            "project_dir": str(tmp_path),
+            "edit_decisions": {
+                "version": "1.0",
+                "render_runtime": "ffmpeg",
+                "cuts": [],
+                "overlays": [
+                    {
+                        "type": "hero_title",
+                        "in_seconds": 1,
+                        "out_seconds": 3,
+                        "text": "字" * 200,
+                    }
+                ],
+            },
+        }
+    )
+    assert error
+    assert "Overlay L0" in error
