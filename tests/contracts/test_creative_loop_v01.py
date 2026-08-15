@@ -127,6 +127,22 @@ def test_research_report_explainer_has_explicit_reentry():
     )
 
 
+def test_anime_hybrid_has_explicit_reentry():
+    order = get_pipeline_stages("anime-hybrid")
+    assert order[order.index("compose") : order.index("independent_qa") + 1] == [
+        "compose",
+        "visual_review",
+        "repair_plan",
+        "patch",
+        "rerender",
+        "independent_qa",
+    ]
+    rerender = next(s for s in load_pipeline("anime-hybrid")["stages"] if s["name"] == "rerender")
+    assert rerender["reentry"]["of"] == "compose"
+    visual_review = next(s for s in load_pipeline("anime-hybrid")["stages"] if s["name"] == "visual_review")
+    assert visual_review["human_approval_default"] is True
+
+
 def test_intent_rejects_checklist_fields():
     payload = _intent()
     payload["segments"][0]["hook_rule"] = "must open with conflict"

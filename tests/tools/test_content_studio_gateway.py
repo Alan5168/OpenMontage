@@ -11,6 +11,7 @@ from lib.checkpoint import init_project, write_checkpoint
 from tools.content_studio_gateway import (
     GatewayError,
     apply_sceneplan_decisions,
+    board_payload,
     prepare_prime_resume,
     record_prime_resume,
     resolve_project,
@@ -118,6 +119,17 @@ def test_show_gate_separates_result_intent_and_prompt(tmp_path: Path):
     assert gate["cuts"][0]["visual_intent"] == "让观众一眼看懂结果不等于放行。"
     assert gate["cuts"][0]["prompt"] == "textless editorial gate and result card"
     assert gate["cuts"][1]["prompt_source_cut_id"] == "c01"
+
+
+def test_board_is_workshop_kanban_not_trae(tmp_path: Path):
+    projects, _project_dir = _fixture_projects(tmp_path)
+    board = board_payload(projects)
+    assert board["workshop_gui"] == "openmontage-backlot"
+    assert board["foreman"] == "prime-agent-tui"
+    assert board["trae_is_studio_gui"] is False
+    assert board["dsh_is_windows_foreman"] is False
+    assert board["motion"]["cut_count"] == 2
+    assert board["motion"]["class_counts"]["LIMITED"] == 2
 
 
 def test_stale_hash_and_invalid_cut_fail_closed(tmp_path: Path):

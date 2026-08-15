@@ -38,6 +38,14 @@ def test_source_policy_mismatch_is_rejected(tmp_path: Path) -> None:
         resolve_scenario(catalog["scenarios"][0]["id"], catalog_path=path)
 
 
+def test_fiction_anime_treats_held_frames_as_grammar() -> None:
+    resolved = resolve_scenario("fiction_anime_episode")
+    thresholds = resolved["profile"]["quality_thresholds"]
+    assert thresholds["held_frame_is_grammar"] is True
+    assert thresholds["freeze_frame_max_seconds"] >= 3.5
+    assert resolved["pipeline"]["name"] == "anime-hybrid"
+
+
 def test_job_selection_is_frozen_and_cannot_switch(tmp_path: Path) -> None:
     path = freeze_scenario_for_job(tmp_path, "comic_nonfiction_short_knowledge_zh")
     payload = json.loads(path.read_text(encoding="utf-8"))

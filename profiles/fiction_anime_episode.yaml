@@ -7,6 +7,6 @@ language: multilingual
 narration_mode: DIALOGUE_OR_ESTIMATE
 sceneplan_contract: seven-column-v1
 source_policy: GENERATED_ORIGINAL_ONLY
-quality_thresholds: {subtitle_safe_area_required: true, black_frame_max_seconds: 0.10, freeze_frame_max_seconds: 1.00, integrated_lufs_target: -16, true_peak_max_dbtp: -1.5, vo_bgm_min_db: 8}
+quality_thresholds: {subtitle_safe_area_required: true, black_frame_max_seconds: 0.10, freeze_frame_max_seconds: 3.5, held_frame_is_grammar: true, integrated_lufs_target: -16, true_peak_max_dbtp: -1.5, vo_bgm_min_db: 8}
 provider_policy: {image_capability: image_generation, video_capability: video_generation, static_image_via_video_provider_forbidden: true, image_allowlist: [volcengine], video_allowlist: [comfyui, video-gen-pool], local_video_equipment: [h3-comfyui, remotion]}
 metadata: {character_bible_required: true, identity_gate_required: true}

@@ -23,6 +23,8 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from lib.checkpoint import get_pipeline_stages, validate_checkpoint, write_checkpoint
+from lib.motion_router import MotionRouterError, summarize_scenes
+from backlot.state import load_board_state
 from tools.prime_session_path import SessionPathError, resolve_session_jsonl
 from tools.prime_usage_ledger import summarize_session_usage
 from tools.prime_resume_evidence import verify_resume_events
@@ -298,7 +300,9 @@ def show_gate_payload(projects_dir: Path, project_id: str | None = None) -> dict
         "action": "show_sceneplan_gate",
         "project_id": project["project_id"],
         "title": project["title"],
-        "entry_channel_required": "Windows Pi",
+        "entry_channel_required": "human",
+        "workshop_gui": "openmontage-backlot",
+        "foreman": "prime-agent-tui",
         "checkpoint": {
             "stage": checkpoint["stage"],
             "status": checkpoint["status"],
@@ -314,6 +318,40 @@ def show_gate_payload(projects_dir: Path, project_id: str | None = None) -> dict
         "cut_count": len(cuts),
         "cuts": cuts,
         "visual_continuity": evaluate_visual_continuity(scene_plan),
+    }
+
+
+def board_payload(projects_dir: Path, project_id: str | None = None) -> dict[str, Any]:
+    """Workshop kanban. This is the studio GUI; Trae is not."""
+    project = resolve_project(projects_dir, project_id)
+    state = load_board_state(project["project_dir"])
+    scenes = []
+    storyboard = state.get("storyboard") or {}
+    if isinstance(storyboard, dict):
+        scenes = storyboard.get("scenes") or []
+    try:
+        motion = summarize_scenes(scenes)
+    except MotionRouterError as exc:
+        raise GatewayError(str(exc)) from exc
+    waiting = []
+    artifact = (state.get("artifacts") or {}).get("scene_plan") or {}
+    if isinstance(artifact, dict):
+        waiting = list((artifact.get("metadata") or {}).get("waiting_on") or [])
+    return {
+        "schema_version": "content-studio-board/v1",
+        "action": "board",
+        "workshop_gui": "openmontage-backlot",
+        "foreman": "prime-agent-tui",
+        "trae_is_studio_gui": False,
+        "dsh_is_windows_foreman": False,
+        "project_id": project["project_id"],
+        "title": project["title"],
+        "pipeline_type": project["pipeline_type"],
+        "awaiting_human": project["awaiting_human"],
+        "waiting_on": waiting,
+        "stages": state.get("stages") or [],
+        "motion": motion,
+        "storyboard": storyboard,
     }
 
 
@@ -754,6 +792,7 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("current")
     sub.add_parser("show-gate")
+    sub.add_parser("board")
     apply_parser = sub.add_parser("apply-sceneplan")
     apply_parser.add_argument("--expected-checkpoint-sha256", required=True)
     apply_parser.add_argument("--decisions-json", required=True)
@@ -773,6 +812,8 @@ def main() -> int:
             payload = current_payload(args.projects_dir, args.project_id)
         elif args.command == "show-gate":
             payload = show_gate_payload(args.projects_dir, args.project_id)
+        elif args.command == "board":
+            payload = board_payload(args.projects_dir, args.project_id)
         elif args.command == "apply-sceneplan":
             decisions = json.loads(args.decisions_json)
             payload = apply_sceneplan_decisions(

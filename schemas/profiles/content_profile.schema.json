@@ -65,6 +65,7 @@
         "subtitle_safe_area_required": { "type": "boolean" },
         "black_frame_max_seconds": { "type": "number", "minimum": 0 },
         "freeze_frame_max_seconds": { "type": "number", "minimum": 0 },
+        "held_frame_is_grammar": { "type": "boolean", "default": false },
         "integrated_lufs_target": { "type": ["number", "null"] },
         "true_peak_max_dbtp": { "type": ["number", "null"] },
         "vo_bgm_min_db": { "type": ["number", "null"] }

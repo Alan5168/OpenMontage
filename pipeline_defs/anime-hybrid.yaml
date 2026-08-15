@@ -1,5 +1,5 @@
 name: anime-hybrid
-version: "0.2"
+version: "0.3"
 description: >
   Rebuilt clean-room fiction/anime pipeline using one canonical scene_plan cut id,
   a character/world continuity artifact, and bounded H3/2.5D/programmatic motion routing.
@@ -19,7 +19,8 @@ orchestration: {mode: executive-producer, skill: pipelines/anime-hybrid/executiv
 extensions: {custom_scripts: true, custom_playbooks: true, custom_skills: true, custom_tools: false}
 metadata:
   lifecycle_owner: OpenMontage
-  human_touchpoints: [script, scene_plan, final_gate]
+  human_touchpoints: [script, scene_plan, visual_review, final_gate]
+  limited_anime_studio: true
   archaeology_source: clean_room_reconstruction_not_directory_copy
 stages:
   - {name: commission, skill: pipelines/anime-hybrid/executive-producer, produces: [brief], tools_available: [], checkpoint_required: true, human_approval_default: false}
@@ -32,6 +33,54 @@ stages:
   - {name: assets, skill: pipelines/anime-hybrid/asset-director, required_artifacts_in: [scene_plan, visual_development], produces: [asset_manifest], tools_available: [image_selector, video_selector, video_compose], checkpoint_required: true, human_approval_default: false}
   - {name: edit, skill: pipelines/anime-hybrid/asset-director, required_artifacts_in: [scene_plan, asset_manifest], produces: [edit_decisions], tools_available: [subtitle_gen, audio_mixer, video_compose], checkpoint_required: true, human_approval_default: false}
   - {name: compose, skill: pipelines/anime-hybrid/asset-director, required_artifacts_in: [edit_decisions, asset_manifest], produces: [render_report], tools_available: [video_compose, audio_mixer, video_stitch], checkpoint_required: true, human_approval_default: false}
-  - {name: independent_qa, skill: pipelines/anime-hybrid/quality-director, required_artifacts_in: [render_report, scene_plan], produces: [final_review], tools_available: [video_analyzer], checkpoint_required: true, human_approval_default: false}
+  - name: visual_review
+    skill: pipelines/anime-hybrid/quality-director
+    required_artifacts_in: [render_report]
+    produces: [creative_intent_contract, frame_packet, editorial_critique]
+    tools_available: [video_analyzer]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Frames come from the actual mp4 including t=0 and dialogue anchors
+      - Critique cites timestamps against frozen intent; text-only render_success is not SEE
+      - LIMITED held frames are grammar, not freeze-frame defects
+      - Prime/Pi/Trae may write CRITIQUE and PATCH_PROPOSAL, never APPROVED
+    success_criteria: [Schema-valid frame_packet with existing image files, Critique findings are timestamped]
+  - name: repair_plan
+    skill: pipelines/anime-hybrid/quality-director
+    required_artifacts_in: [editorial_critique, creative_intent_contract]
+    produces: [repair_plan]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Plan names failed cuts only
+      - I2V_HARD is the only class that may request H3
+      - PATCH_PROPOSAL cannot skip to APPROVED
+    success_criteria: [Schema-valid repair_plan]
+  - name: patch
+    skill: pipelines/anime-hybrid/quality-director
+    required_artifacts_in: [repair_plan]
+    produces: [patch_receipt]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Receipt records draft hash
+      - Unrelated LIMITED holds were not regenerated
+    success_criteria: [Schema-valid patch_receipt]
+  - name: rerender
+    skill: pipelines/anime-hybrid/asset-director
+    required_artifacts_in: [patch_receipt, edit_decisions, asset_manifest]
+    produces: [render_report]
+    tools_available: [video_compose, audio_mixer, video_stitch]
+    checkpoint_required: true
+    human_approval_default: false
+    reentry: {of: compose, max_cycles: 1, required_cycle: true}
+    review_focus:
+      - Output hash differs from the draft compose hash
+      - Machine gates re-run on the new hash
+    success_criteria: [after_sha256 differs from before_sha256]
+  - {name: independent_qa, skill: pipelines/anime-hybrid/quality-director, required_artifacts_in: [render_report, scene_plan, editorial_critique], produces: [final_review], tools_available: [video_analyzer], checkpoint_required: true, human_approval_default: false}
   - {name: final_gate, skill: pipelines/anime-hybrid/quality-director, required_artifacts_in: [final_review, render_report], produces: [final_gate], tools_available: [], checkpoint_required: true, human_approval_default: true}
   - {name: publish_package, skill: pipelines/anime-hybrid/quality-director, required_artifacts_in: [final_gate, render_report], produces: [publish_log], tools_available: [export_bundle], checkpoint_required: true, human_approval_default: false}

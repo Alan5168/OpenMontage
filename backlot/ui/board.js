@@ -858,7 +858,7 @@ function renderSevenColumnStoryboard(s) {
       el("td", { class: "col-content" },
         el("div", { class: "layout-notes" }, card.layout_notes || card.description || ""),
         card.t2i_prompt ? el("details", {}, el("summary", {}, "layout prompt"), el("code", {}, card.t2i_prompt)) : null,
-        el("span", { class: "route" }, card.motion_route || "")),
+        el("span", { class: "route" }, [card.animation_class, card.motion_route, card.generation_status].filter(Boolean).join(" · "))),
       el("td", { class: "col-dialogue" }, card.dialogue || ""),
       el("td", { class: "col-seconds" }, seconds),
       el("td", { class: "col-sound" },

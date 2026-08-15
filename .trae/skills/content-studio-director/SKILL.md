@@ -8,6 +8,10 @@ description: >
 
 # Content Studio Director
 
+OM 是 Studio。本 skill 只是跟工头讲话的入口，不是制作监看 GUI。
+看板：`python tools/content_studio_gateway.py --project-id <id> board`
+或 Backlot `/p/<id>`。长任务用 Prime Agent TUI，不要把 DSH 搬来 Windows。
+
 只调用下面固定 CLI。禁止现场拼 Python / PowerShell。禁止写 checkpoint / PASS。
 
 工作目录必须是本 OpenMontage 仓库。`--project-id` 从 Alan 或 `current` 输出读取，不要猜。

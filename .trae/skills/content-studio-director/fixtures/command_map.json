@@ -4,6 +4,7 @@
     "read-only": [
       "tools/content_studio_gateway.py current",
       "tools/content_studio_gateway.py show-gate",
+      "tools/content_studio_gateway.py board",
       "tools/content_studio_gateway.py status",
       "tools/content_studio_async_console.py job-status",
       "tools/om_context_bridge.py search"

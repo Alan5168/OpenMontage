@@ -507,6 +507,9 @@ def _build_storyboard(
             "sound_intent": scene.get("sound_intent"),
             "reuse": scene.get("reuse"),
             "motion_route": scene.get("motion_route"),
+            "animation_class": scene.get("animation_class") or "LIMITED",
+            "generation_status": scene.get("generation_status") or "pending",
+            "h3_allowed": str(scene.get("animation_class") or "LIMITED").upper() == "I2V_HARD",
             "image_provenance": scene.get("image_provenance"),
             "review_decision": scene.get("review_decision") or "pending",
             "review_notes": scene.get("review_notes"),
@@ -531,6 +534,8 @@ def _build_storyboard(
         "total_duration_seconds": total,
         "style_playbook": scene_plan.get("style_playbook"),
         "presentation_contract": (scene_plan.get("metadata") or {}).get("presentation_contract"),
+        "waiting_on": (scene_plan.get("metadata") or {}).get("waiting_on") or [],
+        "render_allowed": (scene_plan.get("metadata") or {}).get("render_allowed"),
     }
 
 
