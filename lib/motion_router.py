@@ -1,15 +1,18 @@
 """Per-cut motion routing for the Limited Anime Studio.
 
 OM owns the graph. Agents may propose PATCH. They cannot approve.
-H3 is the motion department: I2V_HARD only.
+H3 is the motion department: I2V_HARD only, and only after the visual-constraint
+gate lets the cut leave planning.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
+from lib.shot_production_gate import PLANNING, UNCLASSIFIED, evaluate_cut, evaluate_plan
+
 ANIMATION_CLASSES = ("LIMITED", "I2V_STANDARD", "I2V_HARD")
-DEFAULT_CLASS = "LIMITED"
 
 LOCAL_COMPOSE = "local_compose"
 VIDEO_MODEL = "video_model"
@@ -42,38 +45,64 @@ class MotionRouterError(ValueError):
 
 
 def animation_class_of(scene: dict[str, Any]) -> str:
-    raw = str(scene.get("animation_class") or DEFAULT_CLASS).strip().upper()
+    raw = str(scene.get("animation_class") or "").strip().upper()
     if raw not in ANIMATION_CLASSES:
         raise MotionRouterError(f"unknown animation_class: {raw!r}")
     return raw
 
 
-def route_cut(scene: dict[str, Any]) -> dict[str, Any]:
-    """Return the cheapest legal motion department for one cut."""
-    cls = animation_class_of(scene)
-    h3_allowed = cls == "I2V_HARD"
+def department_for_class(cls: str) -> tuple[str, list[str], bool]:
     if cls == "LIMITED":
-        department = LOCAL_COMPOSE
-        equipment = ["remotion", "ffmpeg", "overlay"]
-    elif cls == "I2V_STANDARD":
-        department = VIDEO_MODEL
-        equipment = ["video-gen-pool"]
-    else:
-        department = H3
-        equipment = ["h3-comfyui", "video-gen-pool"]
-    requested = str(scene.get("primary_model") or scene.get("motion_route") or "")
-    if not h3_allowed and _looks_like_h3(requested):
-        raise MotionRouterError(
-            f"cut {scene.get('id')!r} is {cls}; H3 is not on this edge"
-        )
+        return LOCAL_COMPOSE, ["remotion", "ffmpeg", "overlay"], False
+    if cls == "I2V_STANDARD":
+        return VIDEO_MODEL, ["video-gen-pool"], False
+    if cls == "I2V_HARD":
+        return H3, ["h3-comfyui", "video-gen-pool"], True
+    raise MotionRouterError(f"unknown animation_class: {cls!r}")
+
+
+def route_cut(
+    scene: dict[str, Any],
+    *,
+    scene_plan: dict[str, Any] | None = None,
+    project_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    """Return the legal department for one cut, or planning if unconstrained."""
+    planned = str(scene.get("animation_class") or "").strip().upper() or None
+    if planned is not None:
+        cls = animation_class_of(scene)
+        requested = str(scene.get("primary_model") or scene.get("motion_route") or "")
+        if cls != "I2V_HARD" and _looks_like_h3(requested):
+            raise MotionRouterError(
+                f"cut {scene.get('id')!r} is {cls}; H3 is not on this edge"
+            )
+    root = Path(project_dir) if project_dir is not None else None
+    gate = evaluate_cut(scene, scene_plan=scene_plan, project_dir=root)
+    if not gate["production_ready"]:
+        return {
+            "cut_id": scene.get("id"),
+            "animation_class": planned,
+            "planned_class": planned,
+            "department": PLANNING if planned else UNCLASSIFIED,
+            "h3_allowed": False,
+            "equipment": [],
+            "generation_status": scene.get("generation_status") or "pending",
+            "render_allowed": False,
+            "production_ready": False,
+            "blockers": gate["blockers"],
+        }
+    department, equipment, h3_allowed = department_for_class(planned)
     return {
         "cut_id": scene.get("id"),
-        "animation_class": cls,
+        "animation_class": planned,
+        "planned_class": planned,
         "department": department,
         "h3_allowed": h3_allowed,
         "equipment": equipment,
         "generation_status": scene.get("generation_status") or "pending",
-        "render_allowed": bool((scene.get("visual_ref") or {}).get("kind") not in {None, "placeholder"}),
+        "render_allowed": True,
+        "production_ready": True,
+        "blockers": [],
     }
 
 
@@ -94,14 +123,39 @@ def assert_transition(src: str, dst: str, *, actor: str) -> None:
         )
 
 
-def summarize_scenes(scenes: list[dict[str, Any]]) -> dict[str, Any]:
-    rows = [route_cut(scene) for scene in scenes if isinstance(scene, dict)]
-    counts = {cls: 0 for cls in ANIMATION_CLASSES}
+def summarize_scenes(
+    scenes: list[dict[str, Any]],
+    *,
+    scene_plan: dict[str, Any] | None = None,
+    project_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    plan = scene_plan if isinstance(scene_plan, dict) else {"scenes": scenes, "metadata": {}}
+    if scenes and not plan.get("scenes"):
+        plan = {**plan, "scenes": scenes}
+    rows = [
+        route_cut(scene, scene_plan=plan, project_dir=project_dir)
+        for scene in (plan.get("scenes") or scenes)
+        if isinstance(scene, dict)
+    ]
+    planned_counts = {cls: 0 for cls in ANIMATION_CLASSES}
+    dispatch_counts = {cls: 0 for cls in ANIMATION_CLASSES}
     for row in rows:
-        counts[row["animation_class"]] += 1
+        planned = row.get("planned_class")
+        if planned in planned_counts:
+            planned_counts[planned] += 1
+        if row.get("production_ready") and planned in dispatch_counts:
+            dispatch_counts[planned] += 1
+    root = Path(project_dir) if project_dir is not None else None
+    overview = evaluate_plan(plan, root)
     return {
         "cut_count": len(rows),
-        "class_counts": counts,
+        "class_counts": planned_counts,
+        "dispatch_class_counts": dispatch_counts,
         "h3_cut_ids": [row["cut_id"] for row in rows if row["h3_allowed"]],
+        "planning_cut_ids": overview["planning_cut_ids"],
+        "dispatchable_cut_ids": overview["dispatchable_cut_ids"],
+        "unclassified_cut_ids": overview["unclassified_cut_ids"],
+        "job_blockers": overview["job_blockers"],
+        "render_allowed": overview["render_allowed"],
         "cuts": rows,
     }

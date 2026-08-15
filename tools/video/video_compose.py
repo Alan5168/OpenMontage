@@ -341,11 +341,24 @@ class VideoCompose(BaseTool):
         )
         return info
 
+    def _visual_constraint_block(self, inputs: dict[str, Any]) -> ToolResult | None:
+        """Cuts without approved stills never reach compose/render."""
+        from lib.shot_production_gate import motion_dispatch_error
+
+        error = motion_dispatch_error(inputs)
+        if error:
+            return ToolResult(success=False, error=error)
+        return None
+
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
         operation = inputs["operation"]
         start = time.time()
 
         try:
+            if operation in {"compose", "render"}:
+                blocked = self._visual_constraint_block(inputs)
+                if blocked is not None:
+                    return blocked
             if operation == "compose":
                 result = self._compose(inputs)
             elif operation == "render":
@@ -452,6 +465,10 @@ class VideoCompose(BaseTool):
         edit_decisions = inputs.get("edit_decisions")
         if not edit_decisions:
             return ToolResult(success=False, error="edit_decisions required for compose")
+
+        blocked = self._visual_constraint_block(inputs)
+        if blocked is not None:
+            return blocked
 
         preflight_block, edit_decisions = self._overlay_preflight_gate(edit_decisions, inputs)
         if preflight_block is not None:
@@ -1565,6 +1582,10 @@ class VideoCompose(BaseTool):
         asset_manifest = inputs.get("asset_manifest")
         if not edit_decisions:
             return ToolResult(success=False, error="edit_decisions required for render")
+
+        blocked = self._visual_constraint_block(inputs)
+        if blocked is not None:
+            return blocked
 
         # --- Runtime routing: honor render_runtime locked at proposal ---
         # Silent swaps are forbidden by governance. Resolve this before any

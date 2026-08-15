@@ -34,6 +34,7 @@ python tools/content_studio_async_console.py --project-id <id> build-review-pack
 ```
 
 未获 Alan 当场授权，不要提交 H3 / render / publish。
+`board` 里 `department=planning` 的 cut 还没有过审静帧，图上走不到 render。
 
 ## 看图 / Visual QA
 
@@ -52,6 +53,12 @@ python tools/content_studio_gateway.py --project-id <id> apply-sceneplan --expec
 ```
 
 `decisions-json` 只能是 Alan 给出的 keep/change/merge/omit。Agent 不得代批。
+
+人锁 master sheet / animatic（不批准 cut，也不开 H3）：
+
+```text
+python tools/content_studio_gateway.py --project-id <id> lock-visuals --i-am-human --master-sheet <png> --animatic <file>
+```
 
 ## Direct Prime（T5）
 

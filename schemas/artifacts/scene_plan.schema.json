@@ -53,7 +53,7 @@
           "animation_class": {
             "type": "string",
             "enum": ["LIMITED", "I2V_STANDARD", "I2V_HARD"],
-            "description": "Per-cut motion class. LIMITED is the default comic path; I2V_* is the minority hard-motion path. Not a second pipeline."
+            "description": "Planned motion class. Dispatch to local_compose / video_model / H3 is illegal until lib/shot_production_gate reports production_ready."
           },
           "character_ids": {
             "type": "array",
@@ -245,7 +245,10 @@
       },
       "minItems": 1
     },
-    "metadata": { "type": "object" },
+    "metadata": {
+      "type": "object",
+      "description": "Job metadata. Limited Anime Studio visual locks: master_sheet_path, animatic_path, master_sheet_locked, animatic_locked. render_allowed is derived by lib/shot_production_gate; a stored true cannot bypass missing stills."
+    },
     "visual_continuity_package": {
       "type": "object",
       "description": "Hard-gate package for multi-mother visual continuity before assets",

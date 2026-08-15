@@ -15,6 +15,7 @@
     ],
     "human-write": [
       "tools/content_studio_gateway.py apply-sceneplan",
+      "tools/content_studio_gateway.py lock-visuals",
       "tools/run_content_studio_prime_chat.py"
     ]
   },

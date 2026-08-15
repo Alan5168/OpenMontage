@@ -12,6 +12,7 @@ from tools.content_studio_gateway import (
     GatewayError,
     apply_sceneplan_decisions,
     board_payload,
+    lock_visuals,
     prepare_prime_resume,
     record_prime_resume,
     resolve_project,
@@ -129,7 +130,9 @@ def test_board_is_workshop_kanban_not_trae(tmp_path: Path):
     assert board["trae_is_studio_gui"] is False
     assert board["dsh_is_windows_foreman"] is False
     assert board["motion"]["cut_count"] == 2
-    assert board["motion"]["class_counts"]["LIMITED"] == 2
+    assert board["motion"]["class_counts"]["LIMITED"] == 0
+    assert board["motion"]["unclassified_cut_ids"] == ["c01", "c02"]
+    assert board["motion"]["render_allowed"] is False
 
 
 def test_stale_hash_and_invalid_cut_fail_closed(tmp_path: Path):
@@ -448,3 +451,78 @@ def test_independent_t2i_mothers_cannot_be_approved(tmp_path: Path):
                 {"cut_id": "c02", "decision": "keep"},
             ],
         )
+
+
+def _vid3_projects(tmp_path: Path) -> tuple[Path, Path]:
+    projects = tmp_path / "jobs"
+    project_id = "vid3-blacklisted-chef-90s-v1"
+    project_dir = projects / project_id
+    plan = json.loads(
+        Path("tests/fixtures/content_studio/scene_plan_vid3_shot_fields.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    init_project(
+        project_id,
+        title="VID-3",
+        pipeline_type="unknown",
+        pipeline_dir=projects,
+        style_playbook="premium-minimalist",
+    )
+    (project_dir / "artifacts").mkdir(exist_ok=True)
+    (project_dir / "artifacts" / "scene_plan.json").write_text(
+        json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    write_checkpoint(
+        projects,
+        project_id,
+        "scene_plan",
+        "awaiting_human",
+        {"scene_plan": plan},
+        pipeline_type="unknown",
+        style_playbook="premium-minimalist",
+        human_approval_required=True,
+        human_approved=False,
+    )
+    return projects, project_dir
+
+
+def test_vid3_board_stays_in_planning(tmp_path: Path):
+    projects, _project_dir = _vid3_projects(tmp_path)
+    board = board_payload(projects, "vid3-blacklisted-chef-90s-v1")
+    assert board["motion"]["render_allowed"] is False
+    assert board["motion"]["dispatchable_cut_ids"] == []
+    assert board["motion"]["planning_cut_ids"] == ["c001"]
+    assert board["motion"]["cuts"][0]["department"] == "planning"
+
+
+def test_lock_visuals_requires_human_and_does_not_dispatch_cuts(tmp_path: Path):
+    projects, project_dir = _vid3_projects(tmp_path)
+    sheet = project_dir / "master_sheet.png"
+    animatic = project_dir / "animatic.mp4"
+    sheet.write_bytes(b"sheet")
+    animatic.write_bytes(b"animatic")
+    with pytest.raises(GatewayError, match="human-only"):
+        lock_visuals(
+            projects,
+            "vid3-blacklisted-chef-90s-v1",
+            master_sheet=sheet,
+            animatic=animatic,
+            i_am_human=False,
+        )
+    payload = lock_visuals(
+        projects,
+        "vid3-blacklisted-chef-90s-v1",
+        master_sheet=sheet,
+        animatic=animatic,
+        i_am_human=True,
+    )
+    assert payload["status"] == "JOB_VISUALS_LOCKED"
+    assert payload["render_allowed"] is False
+    assert payload["dispatchable_cut_ids"] == []
+    assert "c001" in payload["planning_cut_ids"]
+    board = board_payload(projects, "vid3-blacklisted-chef-90s-v1")
+    assert "master_sheet_unlocked" not in board["motion"]["job_blockers"]
+    assert "animatic_unlocked" not in board["motion"]["job_blockers"]
+    assert board["motion"]["cuts"][0]["department"] == "planning"
+

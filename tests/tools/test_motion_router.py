@@ -5,16 +5,17 @@ import pytest
 from lib.motion_router import MotionRouterError, assert_transition, route_cut, summarize_scenes
 
 
-def test_limited_cut_stays_off_h3():
+def test_limited_cut_stays_in_planning_without_stills():
     row = route_cut({"id": "c001", "animation_class": "LIMITED"})
-    assert row["department"] == "local_compose"
+    assert row["department"] == "planning"
     assert row["h3_allowed"] is False
+    assert row["production_ready"] is False
 
 
-def test_hard_cut_may_use_h3():
+def test_hard_intent_does_not_enable_h3_before_stills():
     row = route_cut({"id": "c009", "animation_class": "I2V_HARD"})
-    assert row["h3_allowed"] is True
-    assert "h3-comfyui" in row["equipment"]
+    assert row["h3_allowed"] is False
+    assert row["department"] == "planning"
 
 
 def test_limited_cannot_request_h3_model():
@@ -33,7 +34,7 @@ def test_agent_cannot_approve():
     assert_transition("HUMAN_SELECT", "APPROVED", actor="human")
 
 
-def test_summarize_counts_classes():
+def test_summarize_counts_planned_classes_not_live_routes():
     payload = summarize_scenes(
         [
             {"id": "a", "animation_class": "LIMITED"},
@@ -42,4 +43,5 @@ def test_summarize_counts_classes():
         ]
     )
     assert payload["class_counts"]["LIMITED"] == 1
-    assert payload["h3_cut_ids"] == ["c"]
+    assert payload["h3_cut_ids"] == []
+    assert payload["dispatchable_cut_ids"] == []

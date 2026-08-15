@@ -16,9 +16,9 @@
     "I2V_HARD": "exception"
   },
   "waiting_on": [
-    "Alan master sheet",
-    "OM-approved character stills",
-    "animatic lock",
-    "per-cut animation_class"
+    "Alan master sheet file + lock-visuals",
+    "OM-approved character stills on disk (visual_ref.kind=local_image)",
+    "animatic file + lock-visuals",
+    "per-cut production_ready before LIMITED / I2V_STANDARD / I2V_HARD dispatch"
   ]
 }

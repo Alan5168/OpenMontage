@@ -35,6 +35,7 @@
     "profile": "fiction_anime_episode",
     "target_duration_seconds": 90,
     "render_allowed": false,
-    "waiting_on": ["approved_stills", "animatic_lock", "master_sheet"]
+    "waiting_on": ["approved_stills", "animatic_lock", "master_sheet"],
+    "production_gate": "lib/shot_production_gate.py"
   }
 }

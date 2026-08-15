@@ -325,18 +325,26 @@ def board_payload(projects_dir: Path, project_id: str | None = None) -> dict[str
     """Workshop kanban. This is the studio GUI; Trae is not."""
     project = resolve_project(projects_dir, project_id)
     state = load_board_state(project["project_dir"])
-    scenes = []
     storyboard = state.get("storyboard") or {}
-    if isinstance(storyboard, dict):
+    artifact = (state.get("artifacts") or {}).get("scene_plan") or {}
+    if not isinstance(artifact, dict):
+        artifact = {}
+    scenes = artifact.get("scenes") if isinstance(artifact.get("scenes"), list) else None
+    if not scenes and isinstance(storyboard, dict):
         scenes = storyboard.get("scenes") or []
     try:
-        motion = summarize_scenes(scenes)
+        motion = summarize_scenes(
+            scenes or [],
+            scene_plan=artifact if artifact.get("scenes") else {"scenes": scenes or [], "metadata": {}},
+            project_dir=project["project_dir"],
+        )
     except MotionRouterError as exc:
         raise GatewayError(str(exc)) from exc
     waiting = []
-    artifact = (state.get("artifacts") or {}).get("scene_plan") or {}
     if isinstance(artifact, dict):
         waiting = list((artifact.get("metadata") or {}).get("waiting_on") or [])
+    if isinstance(storyboard, dict) and storyboard.get("waiting_on"):
+        waiting = list(storyboard.get("waiting_on") or waiting)
     return {
         "schema_version": "content-studio-board/v1",
         "action": "board",
@@ -352,6 +360,87 @@ def board_payload(projects_dir: Path, project_id: str | None = None) -> dict[str
         "stages": state.get("stages") or [],
         "motion": motion,
         "storyboard": storyboard,
+    }
+
+
+def lock_visuals(
+    projects_dir: Path,
+    project_id: str | None,
+    *,
+    master_sheet: Path,
+    animatic: Path,
+    i_am_human: bool,
+) -> dict[str, Any]:
+    """Human job lock. Does not approve cuts or enable H3."""
+    from lib.shot_production_gate import evaluate_plan
+
+    if not i_am_human:
+        raise GatewayError("lock-visuals is human-only; pass --i-am-human")
+    sheet = Path(master_sheet).expanduser()
+    reel = Path(animatic).expanduser()
+    if not sheet.is_file():
+        raise GatewayError(f"master sheet missing: {sheet}")
+    if not reel.is_file():
+        raise GatewayError(f"animatic missing: {reel}")
+
+    project = resolve_project(projects_dir, project_id)
+    project_dir = project["project_dir"]
+    checkpoint_path, checkpoint = _sceneplan_checkpoint(project_dir)
+    artifact_path, original = _sceneplan_artifact(project_dir, checkpoint)
+    scene_plan = copy.deepcopy(original)
+    meta = scene_plan.setdefault("metadata", {})
+    if not isinstance(meta, dict):
+        raise GatewayError("scene_plan.metadata must be an object")
+    meta["master_sheet_path"] = str(sheet.resolve())
+    meta["master_sheet_locked"] = True
+    meta["animatic_path"] = str(reel.resolve())
+    meta["animatic_locked"] = True
+
+    old_bytes = artifact_path.read_bytes()
+    next_artifacts = copy.deepcopy(checkpoint.get("artifacts") or {})
+    next_artifacts["scene_plan"] = scene_plan
+    next_review = copy.deepcopy(checkpoint.get("review") or {})
+    next_metadata = copy.deepcopy(checkpoint.get("metadata") or {})
+    next_metadata["visual_locks"] = {
+        "locked_by": "human",
+        "timestamp": _utc_now(),
+        "master_sheet_path": meta["master_sheet_path"],
+        "animatic_path": meta["animatic_path"],
+    }
+    try:
+        _atomic_write_json(artifact_path, scene_plan)
+        write_checkpoint(
+            projects_dir,
+            project["project_id"],
+            "scene_plan",
+            checkpoint.get("status") or "awaiting_human",
+            next_artifacts,
+            pipeline_type=checkpoint.get("pipeline_type"),
+            style_playbook=checkpoint.get("style_playbook"),
+            checkpoint_policy=checkpoint.get("checkpoint_policy", "guided"),
+            human_approval_required=checkpoint.get("human_approval_required", True),
+            human_approved=bool(checkpoint.get("human_approved")),
+            review=next_review,
+            cost_snapshot=checkpoint.get("cost_snapshot"),
+            metadata=next_metadata,
+        )
+    except Exception:
+        artifact_path.write_bytes(old_bytes)
+        raise
+
+    overview = evaluate_plan(scene_plan, project_dir)
+    return {
+        "schema_version": "content-studio-lock-visuals/v1",
+        "action": "lock-visuals",
+        "status": "JOB_VISUALS_LOCKED",
+        "project_id": project["project_id"],
+        "master_sheet_path": meta["master_sheet_path"],
+        "animatic_path": meta["animatic_path"],
+        "job_blockers": overview["job_blockers"],
+        "dispatchable_cut_ids": overview["dispatchable_cut_ids"],
+        "planning_cut_ids": overview["planning_cut_ids"],
+        "render_allowed": overview["render_allowed"],
+        "note": "Job locks recorded. Cuts stay in planning until approved stills exist.",
     }
 
 
@@ -793,6 +882,10 @@ def _parser() -> argparse.ArgumentParser:
     sub.add_parser("current")
     sub.add_parser("show-gate")
     sub.add_parser("board")
+    lock_parser = sub.add_parser("lock-visuals")
+    lock_parser.add_argument("--master-sheet", type=Path, required=True)
+    lock_parser.add_argument("--animatic", type=Path, required=True)
+    lock_parser.add_argument("--i-am-human", action="store_true")
     apply_parser = sub.add_parser("apply-sceneplan")
     apply_parser.add_argument("--expected-checkpoint-sha256", required=True)
     apply_parser.add_argument("--decisions-json", required=True)
@@ -814,6 +907,14 @@ def main() -> int:
             payload = show_gate_payload(args.projects_dir, args.project_id)
         elif args.command == "board":
             payload = board_payload(args.projects_dir, args.project_id)
+        elif args.command == "lock-visuals":
+            payload = lock_visuals(
+                args.projects_dir,
+                args.project_id,
+                master_sheet=args.master_sheet,
+                animatic=args.animatic,
+                i_am_human=args.i_am_human,
+            )
         elif args.command == "apply-sceneplan":
             decisions = json.loads(args.decisions_json)
             payload = apply_sceneplan_decisions(

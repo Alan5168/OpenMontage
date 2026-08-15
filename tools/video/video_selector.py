@@ -273,11 +273,11 @@ class VideoSelector(BaseTool):
 
     def execute(self, inputs: dict[str, object]) -> ToolResult:
         from lib.scoring import rank_providers
-
-        candidates = self._providers()
+        from lib.shot_production_gate import motion_dispatch_error
 
         # Rank mode — return scored provider rankings without generating
         if inputs.get("operation") == "rank":
+            candidates = self._providers()
             rank_inputs = self._rank_inputs(inputs)
             task_context = self._prepare_task_context(rank_inputs)
             candidates = self._filter_candidates(rank_inputs, candidates)
@@ -291,7 +291,11 @@ class VideoSelector(BaseTool):
                 },
             )
 
-        # Normal generation — use scored selection
+        blocked = motion_dispatch_error(inputs)
+        if blocked:
+            return ToolResult(success=False, error=blocked)
+
+        candidates = self._providers()
         task_context = self._prepare_task_context(inputs)
         tool, score = self._select_best_tool(inputs, candidates, task_context)
         if tool is None:

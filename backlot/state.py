@@ -463,6 +463,8 @@ def _build_storyboard(
             generating.pop(sid, None)
 
     cards = []
+    from lib.motion_router import MotionRouterError, route_cut
+
     for scene in scene_plan["scenes"]:
         if not isinstance(scene, dict):
             continue
@@ -483,6 +485,16 @@ def _build_storyboard(
             else missing[-1] if missing
             else _find_scene_snapshot(project_dir, sid)
         )
+        try:
+            route = route_cut(scene, scene_plan=scene_plan, project_dir=project_dir)
+        except MotionRouterError as exc:
+            route = {
+                "animation_class": scene.get("animation_class"),
+                "h3_allowed": False,
+                "production_ready": False,
+                "blockers": [str(exc)],
+                "department": "planning",
+            }
         cards.append({
             "id": sid,
             "script_section_id": scene.get("script_section_id"),
@@ -507,9 +519,12 @@ def _build_storyboard(
             "sound_intent": scene.get("sound_intent"),
             "reuse": scene.get("reuse"),
             "motion_route": scene.get("motion_route"),
-            "animation_class": scene.get("animation_class") or "LIMITED",
+            "animation_class": route["animation_class"],
             "generation_status": scene.get("generation_status") or "pending",
-            "h3_allowed": str(scene.get("animation_class") or "LIMITED").upper() == "I2V_HARD",
+            "h3_allowed": route["h3_allowed"],
+            "production_ready": route["production_ready"],
+            "blockers": route["blockers"],
+            "department": route["department"],
             "image_provenance": scene.get("image_provenance"),
             "review_decision": scene.get("review_decision") or "pending",
             "review_notes": scene.get("review_notes"),
@@ -529,13 +544,19 @@ def _build_storyboard(
     if total is None and cards:
         ends = [c["end_seconds"] for c in cards if c["end_seconds"] is not None]
         total = max(ends) if ends else None
+    from lib.shot_production_gate import evaluate_plan
+
+    overview = evaluate_plan(scene_plan, project_dir)
     return {
         "scenes": cards,
         "total_duration_seconds": total,
         "style_playbook": scene_plan.get("style_playbook"),
         "presentation_contract": (scene_plan.get("metadata") or {}).get("presentation_contract"),
         "waiting_on": (scene_plan.get("metadata") or {}).get("waiting_on") or [],
-        "render_allowed": (scene_plan.get("metadata") or {}).get("render_allowed"),
+        "render_allowed": overview["render_allowed"],
+        "job_blockers": overview["job_blockers"],
+        "dispatchable_cut_ids": overview["dispatchable_cut_ids"],
+        "planning_cut_ids": overview["planning_cut_ids"],
     }
 
 

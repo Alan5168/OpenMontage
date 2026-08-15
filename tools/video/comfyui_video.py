@@ -257,6 +257,12 @@ class ComfyUIVideo(BaseTool):
         return 240.0  # ~4 min
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        from lib.shot_production_gate import motion_dispatch_error
+
+        blocked = motion_dispatch_error(inputs)
+        if blocked:
+            return ToolResult(success=False, error=blocked)
+
         custom_workflow = bool(inputs.get("workflow_json") or inputs.get("workflow_path"))
         if custom_workflow and not inputs.get("output_node"):
             return ToolResult(
