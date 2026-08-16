@@ -139,6 +139,22 @@ def _parse_ov_json(stdout: str) -> Any:
             return {"raw": text[:2000]}
 
 
+def _ov_scope_exists(viking_uri: str) -> tuple[bool, dict[str, Any]]:
+    """Verify a server-side scope; local folders are not semantic-index proof."""
+    try:
+        code, stdout, stderr = _ov_cli(["ls", viking_uri], timeout=20)
+    except Exception as exc:
+        return False, {"error": f"{type(exc).__name__}: {exc}"}
+    parsed = _parse_ov_json(stdout)
+    ok = code == 0 and isinstance(parsed, dict) and parsed.get("ok") is True
+    return ok, {
+        "uri": viking_uri,
+        "exit_code": code,
+        "stderr": stderr[-500:],
+        "response": parsed,
+    }
+
+
 def cmd_search(args: argparse.Namespace) -> None:
     """真实调用 OpenViking 0.4.13 `ov find`，禁止用目录 grep 冒充。"""
     ov_ok, ov_detail = _http_ok(f"{OV_HTTP}/health")
@@ -225,6 +241,39 @@ def cmd_read(args: argparse.Namespace) -> None:
                 "stderr": stderr[-500:],
             })
             return
+        # add-resource represents one imported file as an asset directory,
+        # e.g. foo.json/foo.md. Resolve the only materialized child instead
+        # of silently falling back to the workspace mirror.
+        asset_root = args.viking_uri.rstrip("/") + "/"
+        ls_code, ls_stdout, ls_stderr = _ov_cli(["ls", asset_root])
+        ls_parsed = _parse_ov_json(ls_stdout)
+        children = []
+        if isinstance(ls_parsed, dict) and ls_parsed.get("ok") is True:
+            result = ls_parsed.get("result")
+            if isinstance(result, list):
+                children = [
+                    row for row in result
+                    if isinstance(row, dict) and not row.get("isDir") and row.get("uri")
+                ]
+        preferred = [
+            row for row in children
+            if not str(row.get("uri") or "").endswith("/.abstract.md")
+        ]
+        if len(preferred) == 1:
+            resolved_uri = str(preferred[0]["uri"])
+            child_code, child_stdout, child_stderr = _ov_cli(["read", resolved_uri])
+            child_parsed = _parse_ov_json(child_stdout)
+            if child_code == 0:
+                _emit({
+                    "status": "OK",
+                    "viking_uri": args.viking_uri,
+                    "resolved_viking_uri": resolved_uri,
+                    "backend": "openviking-0.4.13-cli",
+                    "content": child_parsed if child_parsed is not None else child_stdout,
+                    "stderr": child_stderr[-500:],
+                    "asset_root_resolved": True,
+                })
+                return
     path = _resolve_viking_uri(args.viking_uri)
     if not path.exists():
         _emit({"status": "NOT_FOUND", "viking_uri": args.viking_uri})
@@ -251,7 +300,7 @@ def cmd_read(args: argparse.Namespace) -> None:
 
 
 def cmd_ingest(args: argparse.Namespace) -> None:
-    """带 provenance/license/hash 导入资源（human-write）"""
+    """Import a verified card into both the workspace and semantic index."""
     manifest_path = Path(args.manifest)
     if not manifest_path.is_file():
         raise ContextBridgeError(f"manifest 不存在: {args.manifest}")
@@ -278,12 +327,39 @@ def cmd_ingest(args: argparse.Namespace) -> None:
             f"hash 不匹配: manifest={manifest['sha256']} actual={sha}"
         )
 
+    viking_uri = _to_viking_uri(target)
+    # `target.write_bytes` alone only creates a workspace mirror. It does not
+    # create OpenViking semantic/vector artifacts. Index the immutable source
+    # first and fail closed before claiming INGESTED.
+    code, stdout, stderr = _ov_cli(
+        [
+            "add-resource",
+            str(src),
+            "--to",
+            viking_uri,
+            "--wait",
+            "--timeout",
+            "120",
+        ],
+        timeout=150,
+    )
+    index_result = _parse_ov_json(stdout)
+    if code != 0 or not (
+        isinstance(index_result, dict) and index_result.get("ok") is True
+    ):
+        raise ContextBridgeError(
+            "OpenViking add-resource 失败，拒绝把本地复制冒充语义入库: "
+            f"exit={code} stderr={stderr[-500:]} result={index_result}"
+        )
+
     target.write_bytes(data)
     _emit({
         "status": "INGESTED",
         "source": str(src),
         "target": str(target),
-        "viking_uri": _to_viking_uri(target),
+        "viking_uri": viking_uri,
+        "semantic_indexed": True,
+        "openviking_result": index_result,
         "sha256": sha,
         "size": len(data),
         "provenance": manifest["provenance"],
@@ -365,7 +441,28 @@ def cmd_health(args: argparse.Namespace) -> None:
         os.environ.get("QDRANT_HEALTH_URL", "http://127.0.0.1:6333/healthz")
     )
 
-    overall = "OK" if (ov_ok and not missing_dirs and http_ok and cli_ok and qdrant_ok) else "FAIL"
+    semantic_scopes: dict[str, Any] = {}
+    required_semantic_scopes = {"goodcase"}
+    semantic_scopes_ok = True
+    for scope, subdir in SCOPE_DIRS.items():
+        uri = f"{VIKING_PREFIX}{subdir}/"
+        scope_ok, detail = _ov_scope_exists(uri)
+        semantic_scopes[scope] = {
+            "exists": scope_ok,
+            "required": scope in required_semantic_scopes,
+            **detail,
+        }
+        if scope in required_semantic_scopes:
+            semantic_scopes_ok = semantic_scopes_ok and scope_ok
+
+    overall = "OK" if (
+        ov_ok
+        and not missing_dirs
+        and http_ok
+        and cli_ok
+        and qdrant_ok
+        and semantic_scopes_ok
+    ) else "FAIL"
     _emit({
         "status": overall,
         "fail_closed": True,
@@ -382,6 +479,8 @@ def cmd_health(args: argparse.Namespace) -> None:
             "cli_detail": cli_detail,
             "session_auto_commit_default_enabled": False,
             "grep_search_disabled": True,
+            "semantic_scopes": semantic_scopes,
+            "semantic_scopes_ok": semantic_scopes_ok,
         },
         "qdrant": {
             "reachable": qdrant_ok,
