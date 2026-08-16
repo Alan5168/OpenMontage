@@ -11,6 +11,12 @@ def test_map_hud_routes_without_h3_reference():
     assert out["h3_reference_recommended"] is False
 
 
+def test_atom_ids_are_not_hardcoded_to_the_p3_pilot():
+    assert ref.ATOM_ID_RE.fullmatch("simple-history-threat-hold")
+    assert ref.ATOM_ID_RE.fullmatch("owned_clip_001")
+    assert not ref.ATOM_ID_RE.fullmatch("../escape")
+
+
 def test_compile_is_semantic_only_and_never_sends_source_clip(tmp_path, monkeypatch):
     atom_root = tmp_path / "reference-atoms"
     atom_root.mkdir()

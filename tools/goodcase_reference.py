@@ -28,7 +28,8 @@ CONTEXT_ROOT = Path(
 )
 ATOM_ROOT = CONTEXT_ROOT / "goodcases" / "reference-atoms"
 BRIDGE = OM_ROOT / "tools" / "om_context_bridge.py"
-ATOM_URI_RE = re.compile(r"/reference-atoms/(p3_[^/]+)\.json")
+ATOM_ID_RE = re.compile(r"[a-z][a-z0-9_-]{2,127}")
+ATOM_URI_RE = re.compile(r"/reference-atoms/([a-z][a-z0-9_-]{2,127})\.json")
 NON_H3_RE = re.compile(
     r"\b(map|hud|chart|graph|timeline|year card|infographic|table)\b|"
     r"地图|图表|年份卡|信息图|数据表",
@@ -66,7 +67,7 @@ def route_intent(query: str) -> dict[str, Any]:
 
 
 def _load_atom(atom_id: str) -> tuple[dict[str, Any], Path]:
-    if not re.fullmatch(r"p3_[a-z0-9_]+", atom_id):
+    if not ATOM_ID_RE.fullmatch(atom_id):
         raise GoodcaseReferenceError(f"invalid atom id: {atom_id}")
     path = ATOM_ROOT / f"{atom_id}.json"
     if not path.is_file():
