@@ -40,7 +40,7 @@ stages:
     skill: pipelines/research-report-explainer/intake-director
     required_artifacts_in: [brief]
     produces: [report_intake]
-    tools_available: []
+    tools_available: [agnes_vision]
     checkpoint_required: true
     human_approval_default: false
     success_criteria: [Every source has media type, version label, and sha256, Page identity is retained]
@@ -88,7 +88,7 @@ stages:
     skill: pipelines/research-report-explainer/scene-director
     required_artifacts_in: [script, voice_timing, content_architecture]
     produces: [scene_plan]
-    tools_available: [image_selector]
+    tools_available: [image_selector, agnes_vision]
     checkpoint_required: true
     human_approval_default: true
     success_criteria: [Seven-column contract validates, Every new layout has one API reference or explicit placeholder, SCENEPLAN_GATE pack complete]
@@ -96,7 +96,7 @@ stages:
     skill: pipelines/research-report-explainer/asset-director
     required_artifacts_in: [scene_plan, voice_timing]
     produces: [asset_manifest]
-    tools_available: [image_selector, video_selector, diagram_gen, video_compose]
+    tools_available: [image_selector, video_selector, diagram_gen, video_compose, agnes_vision]
     checkpoint_required: true
     human_approval_default: false
     success_criteria: ["Every asset joins by scene_plan.scenes[].id", Readable text is deterministic, Prompt seed model hash and license are recorded]
@@ -133,7 +133,7 @@ stages:
     skill: pipelines/research-report-explainer/quality-director
     required_artifacts_in: [render_report]
     produces: [creative_intent_contract, frame_packet, editorial_critique]
-    tools_available: [video_analyzer]
+    tools_available: [video_analyzer, agnes_vision]
     checkpoint_required: true
     human_approval_default: false
     review_focus:
@@ -182,7 +182,7 @@ stages:
     skill: pipelines/research-report-explainer/quality-director
     required_artifacts_in: [render_report, scene_plan, voice_timing, editorial_critique]
     produces: [final_review]
-    tools_available: [video_analyzer]
+    tools_available: [video_analyzer, agnes_vision]
     checkpoint_required: true
     human_approval_default: false
     success_criteria: [Deterministic L0 cannot be overridden by L1, Findings carry timestamps and cut ids]

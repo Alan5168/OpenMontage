@@ -6,6 +6,7 @@ from tools.base_tool import ToolStatus
 from tools.graphics.agnes_image import AgnesImage
 from tools.video.agnes_video import AgnesVideo
 from tools.analysis.agnes_vision import AgnesVision
+from lib.pipeline_loader import load_pipeline
 
 
 def test_agnes_tools_require_environment_key(monkeypatch) -> None:
@@ -151,3 +152,37 @@ def test_registry_discovers_all_agnes_tools(monkeypatch) -> None:
     registry.register_module(video_module)
     registry.register_module(vision_module)
     assert {"agnes_image", "agnes_video", "agnes_vision"}.issubset(registry.list_all())
+
+
+def test_content_pipelines_expose_vision_only_at_visual_stages() -> None:
+    expected = {
+        "research-report-explainer": {
+            "report_intake",
+            "scene_plan",
+            "assets",
+            "visual_review",
+            "independent_qa",
+        },
+        "comic-nonfiction": {
+            "visual_development",
+            "scene_plan",
+            "assets",
+            "independent_qa",
+        },
+        "anime-hybrid": {
+            "visual_development",
+            "scene_plan",
+            "assets",
+            "visual_review",
+            "independent_qa",
+        },
+    }
+
+    for pipeline_name, expected_stages in expected.items():
+        manifest = load_pipeline(pipeline_name)
+        actual_stages = {
+            stage["name"]
+            for stage in manifest["stages"]
+            if "agnes_vision" in stage.get("tools_available", [])
+        }
+        assert actual_stages == expected_stages

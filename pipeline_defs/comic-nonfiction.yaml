@@ -80,7 +80,7 @@ stages:
     skill: pipelines/comic-nonfiction/visual-development-director
     required_artifacts_in: [content_architecture, script]
     produces: [visual_development]
-    tools_available: [image_selector]
+    tools_available: [image_selector, agnes_vision]
     checkpoint_required: true
     human_approval_default: false
     success_criteria: [Original style boundary, Character and world continuity, Reuse budget and motion routes]
@@ -88,7 +88,7 @@ stages:
     skill: pipelines/comic-nonfiction/scene-director
     required_artifacts_in: [script, voice_timing, visual_development]
     produces: [scene_plan]
-    tools_available: [image_selector]
+    tools_available: [image_selector, agnes_vision]
     checkpoint_required: true
     human_approval_default: true
     success_criteria: [Seven-column contract validates, API layout references carry provenance, SCENEPLAN_GATE pack complete]
@@ -96,7 +96,7 @@ stages:
     skill: pipelines/comic-nonfiction/asset-director
     required_artifacts_in: [scene_plan, visual_development]
     produces: [asset_manifest]
-    tools_available: [image_selector, video_selector, video_compose]
+    tools_available: [image_selector, video_selector, video_compose, agnes_vision]
     checkpoint_required: true
     human_approval_default: false
     success_criteria: [Assets join by cut id, H3 is not called before approved scene plan, Readable text is deterministic]
@@ -120,7 +120,7 @@ stages:
     skill: pipelines/comic-nonfiction/quality-director
     required_artifacts_in: [render_report, scene_plan, voice_timing]
     produces: [final_review]
-    tools_available: [video_analyzer]
+    tools_available: [video_analyzer, agnes_vision]
     checkpoint_required: true
     human_approval_default: false
     success_criteria: [L0 deterministic gates complete, L1 findings timecoded]
