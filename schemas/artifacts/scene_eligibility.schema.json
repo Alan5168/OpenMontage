@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/scene_eligibility",
+  "title": "Scene Eligibility",
+  "description": "Cheap layer before director watch or high-cost critique. Pixel motion is not performance. Ineligible means technical previz.",
+  "type": "object",
+  "required": [
+    "version",
+    "director_review_eligible",
+    "blockers",
+    "placeholder_composite_present",
+    "same_source_reuse",
+    "pixel_motion_is_not_performance",
+    "judgment"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "const": "scene-eligibility/v0.1" },
+    "director_review_eligible": { "type": "boolean" },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "duration_seconds": { "type": "number" },
+    "character_performance_motion": { "type": "string" },
+    "camera_only_motion": { "type": "string" },
+    "overlay_or_ambient_fx_motion": { "type": "string" },
+    "pixel_motion_coverage": { "type": ["number", "null"] },
+    "pixel_motion_is_not_performance": { "type": "boolean" },
+    "same_source_reuse": { "type": "number", "minimum": 0, "maximum": 1 },
+    "ken_burns_fraction": { "type": "number", "minimum": 0, "maximum": 1 },
+    "placeholder_composite_present": { "type": "boolean" },
+    "unplanned_audio_silence_seconds": { "type": "number" },
+    "first_sound_seconds": { "type": ["number", "null"] },
+    "judgment": { "type": "string", "const": "eligibility_only" },
+    "note": { "type": "string" }
+  }
+}

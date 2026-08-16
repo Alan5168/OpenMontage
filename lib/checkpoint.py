@@ -23,7 +23,7 @@ ALL_KNOWN_STAGES = frozenset([
     "report_intake", "content_architecture", "voice_timing",
     "visual_development", "independent_qa", "final_gate", "publish_package",
     "visual_review", "repair_plan", "patch", "rerender",
-    "overlay_preflight",
+    "overlay_preflight", "temporal_analysis", "limited_grammar",
 ])
 
 # Backward-compatible alias — existing code / tests that import STAGES still work.
@@ -51,6 +51,8 @@ CANONICAL_STAGE_ARTIFACTS = {
     "publish_package": "publish_log",
     "visual_review": "editorial_critique",
     "overlay_preflight": "overlay_preflight",
+    "temporal_analysis": "temporal_motion_report",
+    "limited_grammar": "limited_grammar_report",
     "repair_plan": "repair_plan",
     "patch": "patch_receipt",
     "rerender": "render_report",

@@ -136,6 +136,7 @@ EXPECTED_WORKFLOWS = [
     "flux2-txt2img.json",
     "wan22-i2v-4step.json",
     "wan22-t2v-4step.json",
+    "minimax-h3-i2v.json",
 ]
 
 
@@ -186,6 +187,27 @@ def test_t2v_metadata_stack_uses_14b_compatible_vae():
     vae_entry = next(item for item in BUNDLED_MODEL_STACKS["wan22-t2v-4step"] if item["role"] == "vae")
     assert vae_entry["name"] == "wan_2.1_vae.safetensors"
     assert "Wan_2.1_ComfyUI_repackaged" in vae_entry["download_url"]
+
+
+def test_h3_i2v_workflow_has_templated_nodes():
+    with open(WORKFLOW_DIR / "minimax-h3-i2v.json") as f:
+        w = json.load(f)
+    assert w["7"]["class_type"] == "MiniMaxH3ImageToVideo"
+    assert w["3"]["inputs"]["type"] == "minimax"
+    assert w["16"]["class_type"] == "SaveVideo"
+    assert w["1"]["inputs"]["unet_name"].startswith("MiniMax_H3")
+    assert "18" not in w
+    assert w["11"]["inputs"]["model"] == ["2", 0]
+
+
+def test_h3_metadata_stack_matches_keep_set():
+    from tools._comfyui.metadata import BUNDLED_MODEL_STACKS
+
+    names = {item["name"] for item in BUNDLED_MODEL_STACKS["minimax-h3-i2v"]}
+    assert "MiniMax_H3_FL2VA_pruned_nvfp4.safetensors" in names
+    assert "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors" in names
+    assert "minimax_h3_video_vae_fp16.safetensors" in names
+    assert "minimax_h3_audio_vae_fp32.safetensors" in names
 
 
 # ------------------------------------------------------------------
@@ -418,6 +440,54 @@ class TestCustomWorkflowContract:
         assert provenance["model_stack"] == [{"role": "lora", "name": "style.safetensors"}]
         assert provenance["model_stack_source"] == "caller_supplied"
 
+    def test_h3_ir_uses_bundled_minimax_workflow_not_wan(self, tmp_path):
+        tool = ComfyUIVideo()
+        tool._client.is_available = lambda: True
+        tool._client.check_models = lambda required: (list(required), [])
+        seen = {}
+
+        def fake_upload(path, name):
+            seen["upload"] = str(path)
+            return name
+
+        def fake_generate(workflow, output_node, dest, **kwargs):
+            seen["workflow"] = workflow
+            seen["output_node"] = output_node
+            Path(dest).write_bytes(b"mp4")
+            return [Path(dest)]
+
+        tool._client.upload_image = fake_upload
+        tool._client.generate = fake_generate
+        first = tmp_path / "first.jpg"
+        first.write_bytes(b"jpg")
+
+        result = tool.execute({
+            "operation": "image_to_video",
+            "workflow_model": "minimax-h3",
+            "h3_ir": {
+                "overview": "Avery cannot run",
+                "duration_seconds": 5,
+                "avoid": ["smile", "push-in"],
+                "camera": "locked-off static",
+                "first_frame": str(first),
+            },
+            "output_path": str(tmp_path / "out.mp4"),
+            "seed": 1,
+        })
+
+        assert result.success is True
+        assert seen["output_node"] == "16"
+        assert seen["workflow"]["7"]["class_type"] == "MiniMaxH3ImageToVideo"
+        prompt = seen["workflow"]["7"]["inputs"]["prompt"]
+        assert "The subject does not smile." in prompt
+        assert "Do not invent a smile" in prompt
+        assert "integrated_multimodal_description:" in prompt
+        assert result.data["fps"] == 24
+        assert result.data["num_frames"] == 124
+        assert result.data["hosted_minimax_ir"] is False
+        assert result.data["workflow_provenance"]["workflow"] == "minimax-h3-i2v.json"
+        assert result.model == "minimax-h3"
+
     def test_image_missing_models_are_structured(self):
         tool = ComfyUIImage()
         tool._client.is_available = lambda: True
@@ -512,6 +582,23 @@ class TestVideoOperationReadiness:
             "text_to_video": "available",
             "image_to_video": "degraded",
         }
+
+    def test_h3_keep_set_makes_image_to_video_available_without_wan(self):
+        from tools.video.comfyui_video import _REQUIRED_MODELS_H3_I2V, _REQUIRED_MODELS_I2V, _REQUIRED_MODELS_T2V
+
+        tool = ComfyUIVideo()
+        tool._client.is_available = lambda: True
+
+        def fake_check_models(required):
+            if required == _REQUIRED_MODELS_H3_I2V:
+                return list(required), []
+            return [], list(required)
+
+        tool._client.check_models = fake_check_models
+        assert tool.is_operation_available("text_to_video") is False
+        assert tool.is_operation_available("image_to_video") is True
+        assert _REQUIRED_MODELS_I2V
+        assert _REQUIRED_MODELS_T2V
 
     def test_video_selector_filters_operation_unready_tools(self):
         class PartialVideoTool(BaseTool):

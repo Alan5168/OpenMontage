@@ -207,6 +207,13 @@ class VideoSelector(BaseTool):
                 "items": {"type": "object"},
                 "description": "Optional provenance metadata for custom workflow dependencies.",
             },
+            "h3_ir": {
+                "type": "object",
+                "description": (
+                    "Structured H3 cut spec. Compiled locally by lib.h3_context_ir "
+                    "before comfyui_video MiniMax H3 I2V. Not MiniMax hosted Context-IR."
+                ),
+            },
             "output_path": {"type": "string"},
         },
     }

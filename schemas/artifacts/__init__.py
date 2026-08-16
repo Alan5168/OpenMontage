@@ -43,6 +43,9 @@ ARTIFACT_NAMES = [
     "patch_receipt",
     "learning_event",
     "overlay_preflight",
+    "temporal_motion_report",
+    "limited_grammar_report",
+    "scene_eligibility",
 ]
 
 

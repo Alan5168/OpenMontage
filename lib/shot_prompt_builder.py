@@ -97,6 +97,11 @@ def build_shot_prompt(
     sl = scene.get("shot_language", {})
     layers: list[str] = []
 
+    cls = str(scene.get("animation_class") or "").strip().upper()
+    if scene.get("h3_ir") or cls == "I2V_HARD":
+        from lib.h3_context_ir import compile_from_scene
+        return compile_from_scene(scene, style_context=style_context)["prompt"]
+
     # Layer 1: Camera — lens and depth of field
     camera_parts = []
     if sl.get("lens_mm"):

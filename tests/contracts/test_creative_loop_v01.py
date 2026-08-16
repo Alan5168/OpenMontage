@@ -131,6 +131,8 @@ def test_anime_hybrid_has_explicit_reentry():
     order = get_pipeline_stages("anime-hybrid")
     assert order[order.index("compose") : order.index("independent_qa") + 1] == [
         "compose",
+        "temporal_analysis",
+        "limited_grammar",
         "visual_review",
         "repair_plan",
         "patch",
@@ -141,6 +143,35 @@ def test_anime_hybrid_has_explicit_reentry():
     assert rerender["reentry"]["of"] == "compose"
     visual_review = next(s for s in load_pipeline("anime-hybrid")["stages"] if s["name"] == "visual_review")
     assert visual_review["human_approval_default"] is True
+    assert "temporal_motion_report" in visual_review["required_artifacts_in"]
+    assert "limited_grammar_report" in visual_review["required_artifacts_in"]
+
+
+def _eligible() -> dict:
+    return {
+        "version": "scene-eligibility/v0.1",
+        "director_review_eligible": True,
+        "blockers": [],
+        "placeholder_composite_present": False,
+        "same_source_reuse": 0.0,
+        "pixel_motion_is_not_performance": True,
+        "judgment": "eligibility_only",
+    }
+
+
+def _temporal(source=A) -> dict:
+    return {
+        "version": "temporal-motion-report/v0.1",
+        "source_mp4": "draft.mp4",
+        "source_sha256": source,
+        "duration_seconds": 8,
+        "shot_segments": [{"t_start": 0, "t_end": 8}],
+        "motion_coverage": 0.0,
+        "longest_static_run": 8.0,
+        "motion_type": {"segment_1": "STATIC_HOLD"},
+        "scene_changes": 0,
+        "judgment": "measurement_only",
+    }
 
 
 def test_intent_rejects_checklist_fields():
@@ -160,17 +191,41 @@ def test_generic_critique_is_rejected(tmp_path):
         ]
     )
     with pytest.raises(CreativeLoopError, match="generic"):
-        validate_critique_grounding(critique, _frames(tmp_path), _intent())
+        validate_critique_grounding(critique, _frames(tmp_path), _intent(), _temporal(), _eligible())
 
 
 def test_ungrounded_critique_is_rejected(tmp_path):
     critique = _critique([_finding(frame_ids=["nope"])])
     with pytest.raises(CreativeLoopError, match="unknown frames"):
-        validate_critique_grounding(critique, _frames(tmp_path), _intent())
+        validate_critique_grounding(critique, _frames(tmp_path), _intent(), _temporal(), _eligible())
 
 
 def test_grounded_critique_passes(tmp_path):
-    validate_critique_grounding(_critique(), _frames(tmp_path), _intent())
+    validate_critique_grounding(_critique(), _frames(tmp_path), _intent(), _temporal(), _eligible())
+
+
+def test_critique_without_temporal_report_is_incomplete(tmp_path):
+    with pytest.raises(CreativeLoopError, match="temporal motion report"):
+        validate_critique_grounding(_critique(), _frames(tmp_path), _intent())
+
+
+def test_critique_without_eligibility_is_incomplete(tmp_path):
+    with pytest.raises(CreativeLoopError, match="scene eligibility"):
+        validate_critique_grounding(_critique(), _frames(tmp_path), _intent(), _temporal())
+
+
+def test_previz_cannot_be_sent_to_director_critique(tmp_path):
+    previz = _eligible()
+    previz["director_review_eligible"] = False
+    previz["blockers"] = ["placeholder_composite_present"]
+    previz["placeholder_composite_present"] = True
+    with pytest.raises(CreativeLoopError, match="technical previz"):
+        validate_critique_grounding(_critique(), _frames(tmp_path), _intent(), _temporal(), previz)
+
+
+def test_critique_rejects_temporal_hash_mismatch(tmp_path):
+    with pytest.raises(CreativeLoopError, match="temporal report source_sha256"):
+        validate_critique_grounding(_critique(), _frames(tmp_path), _intent(), _temporal(B), _eligible())
 
 
 def test_learning_event_forbids_retrieval(tmp_path):

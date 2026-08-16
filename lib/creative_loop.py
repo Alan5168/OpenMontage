@@ -144,11 +144,87 @@ def _is_generic(text: str) -> bool:
     return False
 
 
+def see_mp4(
+    mp4: Path,
+    out_dir: Path,
+    *,
+    interval: float = 4.0,
+    anchors: list[float] | None = None,
+    cuts: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Frames plus temporal measurement. Sparse keyframes alone are not SEE."""
+    from lib.temporal_motion import analyze_temporal_motion, write_temporal_motion_report
+
+    out_dir = Path(out_dir)
+    packet = extract_frames(mp4, out_dir, interval=interval, anchors=anchors)
+    (out_dir / "frame_packet.json").write_text(
+        json.dumps(packet, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    report = analyze_temporal_motion(mp4, work_dir=out_dir / "temporal_samples")
+    write_temporal_motion_report(out_dir / "temporal_motion_report.json", report)
+    result: dict[str, Any] = {
+        "frame_packet": packet,
+        "temporal_motion_report": report,
+        "limited_grammar_report": None,
+    }
+    if cuts is not None:
+        from lib.limited_grammar import evaluate_limited_grammar
+
+        grammar = evaluate_limited_grammar(list(cuts), report)
+        validate_artifact("limited_grammar_report", grammar)
+        plan = grammar.get("repair_plan")
+        if plan:
+            validate_artifact("repair_plan", plan)
+        (out_dir / "limited_grammar_report.json").write_text(
+            json.dumps(grammar, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        result["limited_grammar_report"] = grammar
+    from lib.audio_event_map import probe_audio_map
+    from lib.scene_eligibility import evaluate_scene_eligibility
+
+    audio_map = probe_audio_map(mp4)
+    (out_dir / "audio_event_map.json").write_text(
+        json.dumps(audio_map, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    declaration = None
+    if cuts:
+        declaration = {
+            "placeholder_composite": any(c.get("placeholder_composite") for c in cuts if isinstance(c, dict)),
+        }
+    eligibility = evaluate_scene_eligibility(
+        duration_seconds=float(report.get("duration_seconds") or packet.get("duration_seconds") or 0),
+        cuts=list(cuts or []),
+        temporal_report=report,
+        audio_map=audio_map,
+        declaration=declaration,
+    )
+    validate_artifact("scene_eligibility", eligibility)
+    (out_dir / "scene_eligibility.json").write_text(
+        json.dumps(eligibility, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    result["audio_event_map"] = audio_map
+    result["scene_eligibility"] = eligibility
+    return result
+
+
 def validate_critique_grounding(
     critique: dict[str, Any],
     frame_packet: dict[str, Any],
     intent: dict[str, Any],
+    temporal_report: dict[str, Any] | None = None,
+    eligibility_report: dict[str, Any] | None = None,
 ) -> None:
+    from lib.temporal_motion import assert_temporal_see
+    from lib.scene_eligibility import assert_director_review_eligible
+
+    assert_temporal_see(temporal_report)
+    assert_director_review_eligible(eligibility_report)
+    if temporal_report["source_sha256"] != frame_packet["source_sha256"]:
+        raise CreativeLoopError("temporal report source_sha256 does not match the seen mp4")
     validate_artifact("editorial_critique", critique)
     validate_artifact("frame_packet", frame_packet)
     validate_artifact("creative_intent_contract", intent)

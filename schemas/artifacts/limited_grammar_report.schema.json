@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/limited_grammar_report",
+  "title": "LIMITED Grammar Report",
+  "description": "Contract check of declared LIMITED grammar against OM temporal measurement. STATIC_HOLD is legal when the cut declares intentional_hold. Does not decide taste.",
+  "type": "object",
+  "required": ["version", "ok", "finding_count", "findings", "judgment"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "const": "limited-grammar-report/v0.1" },
+    "ok": { "type": "boolean" },
+    "finding_count": { "type": "integer", "minimum": 0 },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["cut_id", "t_start", "t_end", "failure_class", "why", "repair"],
+        "additionalProperties": false,
+        "properties": {
+          "cut_id": { "type": "string" },
+          "t_start": { "type": "number" },
+          "t_end": { "type": "number" },
+          "failure_class": {
+            "type": "string",
+            "enum": [
+              "overlay_grammar_not_executed",
+              "character_missing_from_est",
+              "source_loop_stretch"
+            ]
+          },
+          "why": { "type": "string" },
+          "repair": { "type": "string" }
+        }
+      }
+    },
+    "repair_plan": {
+      "type": ["object", "null"]
+    },
+    "judgment": { "type": "string", "const": "contract_only" },
+    "note": { "type": "string" }
+  }
+}

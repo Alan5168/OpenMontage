@@ -494,6 +494,10 @@ def test_vid3_board_stays_in_planning(tmp_path: Path):
     assert board["motion"]["dispatchable_cut_ids"] == []
     assert board["motion"]["planning_cut_ids"] == ["c001"]
     assert board["motion"]["cuts"][0]["department"] == "planning"
+    assert board["see"]["incomplete"] is True
+    assert board["see"]["temporal_report_present"] is False
+    assert board["ship"]["allowed"] is False
+    assert board["ship"]["planning_render_allowed_is_not_ship"] is True
 
 
 def test_lock_visuals_requires_human_and_does_not_dispatch_cuts(tmp_path: Path):
@@ -520,4 +524,58 @@ def test_lock_visuals_requires_human_and_does_not_dispatch_cuts(tmp_path: Path):
     board = board_payload(projects, "vid3-blacklisted-chef-90s-v1")
     assert "master_sheet_unlocked" not in board["motion"]["job_blockers"]
     assert board["motion"]["cuts"][0]["department"] == "planning"
+
+
+def test_board_surfaces_temporal_see_when_report_exists(tmp_path: Path):
+    projects, project_dir = _vid3_projects(tmp_path)
+    scene_a = project_dir / "working" / "scene_a"
+    scene_a.mkdir(parents=True)
+    (scene_a / "TEMPORAL_MOTION_REPORT.json").write_text(
+        json.dumps(
+            {
+                "version": "temporal-motion-report/v0.1",
+                "source_mp4": "review/scene_a_master.mp4",
+                "source_sha256": "a" * 64,
+                "duration_seconds": 30.2,
+                "shot_segments": [{"t_start": 0, "t_end": 30.2}],
+                "motion_coverage": 0.71,
+                "longest_static_run": 2.5,
+                "motion_type": {"segment_1": "LIMITED_LOCAL_MOTION"},
+                "scene_changes": 4,
+                "judgment": "measurement_only",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (scene_a / "LIMITED_GRAMMAR_REPORT.json").write_text(
+        json.dumps(
+            {
+                "version": "limited-grammar-report/v0.1",
+                "ok": False,
+                "finding_count": 3,
+                "findings": [
+                    {
+                        "cut_id": "A1",
+                        "t_start": 0,
+                        "t_end": 2.5,
+                        "failure_class": "overlay_grammar_not_executed",
+                        "why": "static",
+                        "repair": "rebuild overlay",
+                    }
+                ],
+                "judgment": "contract_only",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    board = board_payload(projects, "vid3-blacklisted-chef-90s-v1")
+    assert board["see"]["incomplete"] is False
+    assert board["see"]["motion_coverage"] == 0.71
+    assert board["see"]["limited_grammar_ok"] is False
+    assert "overlay_grammar_not_executed" in board["see"]["limited_grammar_classes"]
+    assert board["ship"]["allowed"] is False
+    assert board["ship"]["planning_render_allowed_is_not_ship"] is True
+    assert board["ship"]["limited_grammar_ok"] is False
 

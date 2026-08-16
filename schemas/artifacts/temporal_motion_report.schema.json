@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/temporal_motion_report",
+  "title": "Temporal Motion Report",
+  "description": "OM measurement of how time moved on an mp4. STATIC_HOLD is a fact, not a fail. Sparse keyframes are not this artifact.",
+  "type": "object",
+  "required": [
+    "version",
+    "source_mp4",
+    "source_sha256",
+    "duration_seconds",
+    "shot_segments",
+    "motion_coverage",
+    "longest_static_run",
+    "motion_type",
+    "scene_changes",
+    "judgment"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "const": "temporal-motion-report/v0.1" },
+    "source_mp4": { "type": "string" },
+    "source_sha256": { "type": "string", "minLength": 64, "maxLength": 64 },
+    "duration_seconds": { "type": "number", "minimum": 0 },
+    "sample_fps": { "type": "number", "minimum": 0 },
+    "sample_count": { "type": "integer", "minimum": 0 },
+    "shot_segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["t_start", "t_end"],
+        "additionalProperties": false,
+        "properties": {
+          "t_start": { "type": "number" },
+          "t_end": { "type": "number" }
+        }
+      }
+    },
+    "motion_coverage": { "type": "number", "minimum": 0, "maximum": 1 },
+    "longest_static_run": { "type": "number", "minimum": 0 },
+    "motion_type": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "enum": ["STATIC_HOLD", "CAMERA_ONLY", "LIMITED_LOCAL_MOTION", "FULL_MOTION"] }
+    },
+    "segments": { "type": "array" },
+    "camera_motion": { "type": "string" },
+    "local_character_motion": { "type": "string" },
+    "mouth_motion": { "type": "string" },
+    "blink_detected": { "type": "boolean" },
+    "scene_changes": { "type": "integer", "minimum": 0 },
+    "judgment": { "type": "string", "const": "measurement_only" },
+    "note": { "type": "string" }
+  }
+}

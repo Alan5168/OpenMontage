@@ -321,6 +321,66 @@ def show_gate_payload(projects_dir: Path, project_id: str | None = None) -> dict
     }
 
 
+def _read_json_if(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _see_board(project_dir: Path) -> dict[str, Any]:
+    """Surface temporal/grammar measurement. Missing report means SEE is incomplete."""
+    artifacts = Path(project_dir) / "artifacts"
+    scene_a = Path(project_dir) / "working" / "scene_a"
+    temporal = (
+        _read_json_if(artifacts / "temporal_motion_report.json")
+        or _read_json_if(scene_a / "TEMPORAL_MOTION_REPORT.json")
+        or _read_json_if(scene_a / "see" / "temporal_motion_report.json")
+    )
+    grammar = (
+        _read_json_if(artifacts / "limited_grammar_report.json")
+        or _read_json_if(scene_a / "LIMITED_GRAMMAR_REPORT.json")
+        or _read_json_if(scene_a / "see" / "limited_grammar_report.json")
+    )
+    payload: dict[str, Any] = {
+        "temporal_report_present": temporal is not None,
+        "incomplete": temporal is None,
+    }
+    if temporal:
+        payload["motion_coverage"] = temporal.get("motion_coverage")
+        payload["longest_static_run"] = temporal.get("longest_static_run")
+        payload["motion_type"] = temporal.get("motion_type")
+        payload["duration_seconds"] = temporal.get("duration_seconds")
+    if grammar:
+        payload["limited_grammar_ok"] = grammar.get("ok")
+        payload["limited_grammar_finding_count"] = grammar.get("finding_count")
+        payload["limited_grammar_classes"] = [
+            row.get("failure_class") for row in (grammar.get("findings") or []) if isinstance(row, dict)
+        ]
+    return payload
+
+
+def _ship_board(project_dir: Path, *, planning_render_allowed: bool) -> dict[str, Any]:
+    """Planning dispatch is not ship. Only SCENE_STATE.ship is a human green light."""
+    skeleton = _read_json_if(Path(project_dir) / "JOB_SKELETON.json") or {}
+    scene = _read_json_if(Path(project_dir) / "working" / "scene_a" / "SCENE_STATE.json") or {}
+    see = _see_board(project_dir)
+    human_ship = scene.get("ship") is True
+    return {
+        "allowed": human_ship,
+        "human_ship": human_ship,
+        "job_render_allowed": skeleton.get("render_allowed") is True,
+        "planning_render_allowed": bool(planning_render_allowed),
+        "planning_render_allowed_is_not_ship": True,
+        "see_complete": see.get("temporal_report_present") is True and not see.get("incomplete"),
+        "limited_grammar_ok": see.get("limited_grammar_ok"),
+        "reason": "Planning render_allowed is not a production green light. Scene A is not proven shippable.",
+    }
+
+
 def board_payload(projects_dir: Path, project_id: str | None = None) -> dict[str, Any]:
     """Workshop kanban. This is the studio GUI; Trae is not."""
     project = resolve_project(projects_dir, project_id)
@@ -359,6 +419,11 @@ def board_payload(projects_dir: Path, project_id: str | None = None) -> dict[str
         "waiting_on": waiting,
         "stages": state.get("stages") or [],
         "motion": motion,
+        "see": _see_board(project["project_dir"]),
+        "ship": _ship_board(
+            project["project_dir"],
+            planning_render_allowed=bool(motion.get("render_allowed")),
+        ),
         "storyboard": storyboard,
     }
 

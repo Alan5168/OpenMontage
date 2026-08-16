@@ -1,0 +1,31 @@
+{
+  "schema_version": "cold-open-house-rules/v0.1",
+  "scope": "20-30s platform cold open",
+  "not_an_industry_standard": true,
+  "note": "Not a Japanese-industry percentage. Internal trial rule for this Studio's 20-30s cold open.",
+  "rules": {
+    "ken_burns_on_still_max_fraction": 0.20,
+    "single_pure_still_push_max_seconds": 2.5,
+    "intentional_hold_legal": true,
+    "intentional_hold_requires": ["declared_in_scene_intent", "sound_or_emotion_or_information_purpose"],
+    "same_source_loop_max_fraction": 0.25,
+    "ping_pong_is_not_new_performance": true,
+    "placeholder_composite_at_director_review": 0,
+    "audio_intent_coverage": 1.0,
+    "first_sound_event_max_seconds": 0.5,
+    "unplanned_silence_max_seconds_in_first_15": 1.0,
+    "narrative_beat_every_seconds": [2, 4],
+    "performance_shot_character_motion_may_not_be_zero": true
+  },
+  "cut_routing": {
+    "criterion": "Does shot intent require character performance?",
+    "no": "LIMITED is legal if Layout, sound, and declared hold/pan are real",
+    "yes": "loop/zoom cannot impersonate performance; I2V_STANDARD or I2V_HARD",
+    "A1": "LIMITED HUD + cue in first second",
+    "A2": "LIMITED 1.5-2s hold with sound and correct framing",
+    "A3": "LIMITED or H3 micro-reaction; VO is TTS API",
+    "A4": "Layout first, not H3. Character small, perspective and light integrated.",
+    "A5": "H3 candidate",
+    "A6": "H3 candidate"
+  }
+}

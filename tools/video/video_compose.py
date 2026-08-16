@@ -343,11 +343,20 @@ class VideoCompose(BaseTool):
 
     def _visual_constraint_block(self, inputs: dict[str, Any]) -> ToolResult | None:
         """Cuts without approved stills never reach compose/render."""
+        from lib.freeze_hold import apply_static_hold_pad, freeze_hold_error, profile_id_of
         from lib.shot_production_gate import motion_dispatch_error
 
         error = motion_dispatch_error(inputs)
         if error:
             return ToolResult(success=False, error=error)
+        decisions = inputs.get("edit_decisions")
+        props = apply_static_hold_pad(
+            dict(decisions) if isinstance(decisions, dict) else {},
+            profile_id_of(inputs),
+        )
+        freeze_error = freeze_hold_error(inputs, props=props)
+        if freeze_error:
+            return ToolResult(success=False, error=freeze_error)
         return None
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
@@ -1997,6 +2006,17 @@ class VideoCompose(BaseTool):
         if block is not None:
             return block
 
+        from lib.freeze_hold import apply_static_hold_pad, freeze_hold_error, profile_id_of
+
+        props = apply_static_hold_pad(props, profile_id_of(inputs) or profile_id_of(props))
+        renderer_family = (composition_data or {}).get("renderer_family", "explainer-data")
+        composition_id = self._get_composition_id(renderer_family)
+        freeze_error = freeze_hold_error(
+            inputs, composition_id=composition_id, props=props
+        )
+        if freeze_error:
+            return ToolResult(success=False, error=freeze_error)
+
         # Build a custom themeConfig from the playbook's actual colors.
         # This ensures every video gets a unique visual identity derived
         # from its production decisions — not picked from a preset menu.
@@ -2020,8 +2040,6 @@ class VideoCompose(BaseTool):
 
         # Route to the correct Remotion composition based on renderer_family.
         # This prevents all pipelines from collapsing into the Explainer visual grammar.
-        renderer_family = (composition_data or {}).get("renderer_family", "explainer-data")
-        composition_id = self._get_composition_id(renderer_family)
 
         if composition_id == "CinematicRenderer":
             if not props.get("scenes") and props.get("cuts"):

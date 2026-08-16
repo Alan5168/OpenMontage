@@ -176,6 +176,34 @@ BUNDLED_MODEL_STACKS: dict[str, list[dict[str, Any]]] = {
             ),
         },
     ],
+    "minimax-h3-i2v": [
+        {
+            "role": "diffusion_model",
+            "name": "MiniMax_H3_FL2VA_pruned_nvfp4.safetensors",
+            "quantization": "NVFP4",
+            "destination_hint": "C:\\models\\h3-nvfp4\\diffusion_models\\",
+            "download_url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+        },
+        {
+            "role": "text_encoder",
+            "name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+            "quantization": "NVFP4 AWQ",
+            "destination_hint": "C:\\models\\h3-nvfp4\\text_encoders\\",
+            "download_url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+        },
+        {
+            "role": "vae",
+            "name": "minimax_h3_video_vae_fp16.safetensors",
+            "destination_hint": "C:\\models\\h3-nvfp4\\vae\\",
+            "download_url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+        },
+        {
+            "role": "audio_vae",
+            "name": "minimax_h3_audio_vae_fp32.safetensors",
+            "destination_hint": "C:\\models\\h3-nvfp4\\vae\\",
+            "download_url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+        },
+    ],
 }
 
 

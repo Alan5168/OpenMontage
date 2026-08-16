@@ -1,8 +1,11 @@
 """Per-cut motion routing for the Limited Anime Studio.
 
-OM owns the graph. Agents may propose PATCH. They cannot approve.
-H3 is the motion department: I2V_HARD only, and only after the visual-constraint
-gate lets the cut leave planning.
+LIMITED is temporal grammar, not `ffmpeg -loop 1`.
+A cut may be an intentional 止め絵, camera-only, local motion (blink/mouth/steam),
+or must leave LIMITED when shot intent requires character performance.
+loop/zoom cannot impersonate performance. H3 is the motion department:
+I2V_HARD only, and only after the visual-constraint gate lets the cut leave planning.
+A4-class EST is Layout first, not a reason to call H3.
 """
 
 from __future__ import annotations
@@ -53,6 +56,7 @@ def animation_class_of(scene: dict[str, Any]) -> str:
 
 def department_for_class(cls: str) -> tuple[str, list[str], bool]:
     if cls == "LIMITED":
+        # Department, not definition. Grammar is measured later by temporal_motion.
         return LOCAL_COMPOSE, ["remotion", "ffmpeg", "overlay"], False
     if cls == "I2V_STANDARD":
         return VIDEO_MODEL, ["video-gen-pool"], False
@@ -69,6 +73,20 @@ def route_cut(
 ) -> dict[str, Any]:
     """Return the legal department for one cut, or planning if unconstrained."""
     planned = str(scene.get("animation_class") or "").strip().upper() or None
+    if str(scene.get("review_decision") or "").strip().lower() == "omit":
+        return {
+            "cut_id": scene.get("id"),
+            "animation_class": planned,
+            "planned_class": planned,
+            "dispatch_class": None,
+            "department": "omitted",
+            "h3_allowed": False,
+            "equipment": [],
+            "generation_status": scene.get("generation_status") or "pending",
+            "render_allowed": False,
+            "production_ready": False,
+            "blockers": ["review_decision_omit"],
+        }
     if planned is not None:
         animation_class_of(scene)
     root = Path(project_dir) if project_dir is not None else None

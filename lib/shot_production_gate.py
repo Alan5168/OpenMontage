@@ -122,7 +122,16 @@ def evaluate_plan(scene_plan: dict[str, Any] | None, project_dir: Path | None = 
         evaluate_cut(scene, scene_plan=plan, project_dir=project_dir, job=job)
         for scene in scenes
     ]
-    dispatchable = [row["cut_id"] for row in cuts if row["production_ready"]]
+    omitted = {
+        str(row.get("id"))
+        for row in scenes
+        if str(row.get("review_decision") or "").strip().lower() == "omit"
+    }
+    dispatchable = [
+        row["cut_id"]
+        for row in cuts
+        if row["production_ready"] and str(row["cut_id"]) not in omitted
+    ]
     planning = [
         row["cut_id"]
         for row in cuts

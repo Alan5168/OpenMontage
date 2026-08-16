@@ -1,5 +1,5 @@
 name: anime-hybrid
-version: "0.4"
+version: "0.5"
 description: >
   Rebuilt clean-room fiction/anime pipeline using one canonical scene_plan cut id,
   a character/world continuity artifact, and bounded H3/2.5D/programmatic motion routing.
@@ -34,9 +34,34 @@ stages:
   - {name: assets, skill: pipelines/anime-hybrid/asset-director, required_artifacts_in: [scene_plan, visual_development], produces: [asset_manifest], tools_available: [image_selector, video_selector, video_compose], checkpoint_required: true, human_approval_default: false, review_focus: ["Cuts that fail the visual-constraint gate stay in planning", "video_selector and video_compose must not run without approved stills"], success_criteria: [Only production-ready cuts leave planning]}
   - {name: edit, skill: pipelines/anime-hybrid/asset-director, required_artifacts_in: [scene_plan, asset_manifest], produces: [edit_decisions], tools_available: [subtitle_gen, audio_mixer, video_compose], checkpoint_required: true, human_approval_default: false}
   - {name: compose, skill: pipelines/anime-hybrid/asset-director, required_artifacts_in: [edit_decisions, asset_manifest], produces: [render_report], tools_available: [video_compose, audio_mixer, video_stitch], checkpoint_required: true, human_approval_default: false}
-  - name: visual_review
+  - name: temporal_analysis
     skill: pipelines/anime-hybrid/quality-director
     required_artifacts_in: [render_report]
+    produces: [temporal_motion_report]
+    tools_available: [video_analyzer]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Dense temporal measurement of the actual mp4; sparse keyframes are not this stage
+      - STATIC_HOLD is a fact, not a fail
+      - Visual judgment must not start without this report
+    success_criteria: [Schema-valid temporal_motion_report with motion_type and longest_static_run]
+  - name: limited_grammar
+    skill: pipelines/anime-hybrid/quality-director
+    required_artifacts_in: [temporal_motion_report]
+    produces: [limited_grammar_report]
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - overlay_information_change must not measure as STATIC_HOLD
+      - EST with character_ids requires composite or characters_offscreen
+      - local-motion cut longer than source requires explicit cycle_allowed
+      - intentional_hold STATIC_HOLD is legal
+    success_criteria: [Schema-valid limited_grammar_report; findings are contracts not taste]
+  - name: visual_review
+    skill: pipelines/anime-hybrid/quality-director
+    required_artifacts_in: [render_report, temporal_motion_report, limited_grammar_report]
     produces: [creative_intent_contract, frame_packet, editorial_critique]
     tools_available: [video_analyzer]
     checkpoint_required: true
@@ -44,12 +69,13 @@ stages:
     review_focus:
       - Frames come from the actual mp4 including t=0 and dialogue anchors
       - Critique cites timestamps against frozen intent; text-only render_success is not SEE
+      - SEE is frames plus temporal_motion_report; sparse keyframes alone are incomplete
       - LIMITED held frames are grammar, not freeze-frame defects
       - Prime/Pi/Trae may write CRITIQUE and PATCH_PROPOSAL, never APPROVED
-    success_criteria: [Schema-valid frame_packet with existing image files, Critique findings are timestamped]
+    success_criteria: [Schema-valid frame_packet with existing image files, Critique findings are timestamped, Temporal report hash matches the seen mp4]
   - name: repair_plan
     skill: pipelines/anime-hybrid/quality-director
-    required_artifacts_in: [editorial_critique, creative_intent_contract]
+    required_artifacts_in: [editorial_critique, creative_intent_contract, limited_grammar_report]
     produces: [repair_plan]
     tools_available: []
     checkpoint_required: true

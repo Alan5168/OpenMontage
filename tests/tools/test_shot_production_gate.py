@@ -85,6 +85,17 @@ def test_production_ready_limited_enters_local_compose(tmp_path: Path):
     assert_dispatch(plan, project_dir=tmp_path, cut_ids=["c001"])
 
 
+def test_omitted_cut_is_not_dispatchable(tmp_path: Path):
+    plan = _ready_plan(tmp_path, "LIMITED")
+    plan["scenes"][0]["review_decision"] = "omit"
+    overview = evaluate_plan(plan, project_dir=tmp_path)
+    assert overview["dispatchable_cut_ids"] == []
+    assert overview["render_allowed"] is False
+    row = route_cut(plan["scenes"][0], scene_plan=plan, project_dir=tmp_path)
+    assert row["department"] == "omitted"
+    assert row["render_allowed"] is False
+
+
 def test_production_ready_hard_may_use_h3(tmp_path: Path):
     plan = _ready_plan(tmp_path, "I2V_HARD")
     row = route_cut(plan["scenes"][0], scene_plan=plan, project_dir=tmp_path)
