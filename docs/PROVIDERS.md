@@ -15,14 +15,15 @@ Everything you need to know about every provider in OpenMontage — setup instru
 | 3 | **$0** | ElevenLabs | Premium TTS + music + SFX (10K chars/month free) |
 | 4 | **$0** | Piper (local install) | Fully offline TTS — no API key, no cost, no network |
 | 5 | **~$0.03/image** | fal.ai | FLUX images + Kling/Veo/MiniMax video + Recraft — broad single-key image + video coverage |
-| 6 | **~$0.05/image** | OpenAI | GPT Image 2 images + OpenAI TTS |
-| 7 | **~$0.04/image** | Google Imagen | Imagen 4 images (shares the Google API key) |
-| 8 | **pay-as-you-go** | Kling Official | Official direct Kling video, image, TTS, avatar, and lip-sync API, separate from fal.ai Kling |
-| 9 | **$12/month** | Runway | Gen-4 video — highest quality AI video |
-| 10 | **pay-as-you-go** | HeyGen | Avatar videos, multi-model video gateway |
-| 11 | **pay-as-you-go** | Suno | Full song generation with vocals and lyrics |
-| 12 | **$0 + GPU** | Local video gen | WAN 2.1, Hunyuan, CogVideo, LTX — free, offline |
-| 13 | **$0 + GPU** | Local Diffusion | Stable Diffusion images — free, offline |
+| 6 | **account quota** | Agnes AI | Image 2.1, Video 2.0, and image OCR/understanding under one key |
+| 7 | **~$0.05/image** | OpenAI | GPT Image 2 images + OpenAI TTS |
+| 8 | **~$0.04/image** | Google Imagen | Imagen 4 images (shares the Google API key) |
+| 9 | **pay-as-you-go** | Kling Official | Official direct Kling video, image, TTS, avatar, and lip-sync API, separate from fal.ai Kling |
+| 10 | **$12/month** | Runway | Gen-4 video — highest quality AI video |
+| 11 | **pay-as-you-go** | HeyGen | Avatar videos, multi-model video gateway |
+| 12 | **pay-as-you-go** | Suno | Full song generation with vocals and lyrics |
+| 13 | **$0 + GPU** | Local video gen | WAN 2.1, Hunyuan, CogVideo, LTX — free, offline |
+| 14 | **$0 + GPU** | Local Diffusion | Stable Diffusion images — free, offline |
 
 ### Environment Variable Summary
 
@@ -51,6 +52,9 @@ AZURE_SPEECH_REGION=         # Speech resource region, e.g. eastus
 # MULTI-MODEL GATEWAY (one key, 6+ tools)
 FAL_KEY=                     # FLUX, Recraft, Kling, Veo, MiniMax video
 
+# MULTIMODAL IMAGE + VIDEO + VISUAL ANALYSIS
+AGNES_API_KEY=               # Agnes Image 2.1, Video 2.0, image OCR/understanding
+
 # KLING OFFICIAL DIRECT API
 KLING_API_KEY=               # Official Kling video, image, TTS, avatar, lip sync
 KLING_API_BASE_URL=          # Optional; default https://api-singapore.klingai.com
@@ -68,6 +72,52 @@ VIDEO_GEN_LOCAL_MODEL=       # wan2.1-1.3b, wan2.1-14b, hunyuan-1.5, ltx2-local,
 ---
 
 ## Cloud Providers
+
+### Agnes AI — Image + Video + Visual Analysis
+
+> **One key for visual production and inspection.** Agnes is registered as two
+> generation providers plus a visual-analysis sensor. It is not used as the
+> OpenMontage/Prime text-reasoning model.
+
+**Tools unlocked:** `agnes_image`, `agnes_video`, `agnes_vision`
+
+**Env var:** `AGNES_API_KEY`
+
+#### Setup
+
+1. Create an Agnes AI API key in your Agnes account.
+2. Set `AGNES_API_KEY` in the local Windows environment or the repository's
+   untracked `.env` file. Never commit the key.
+3. Restart the OpenMontage/Prime process so provider discovery sees the new
+   environment value.
+
+#### What it is best for
+
+- `agnes_image`: text-to-image, image editing, and multi-image composition with
+  `agnes-image-2.1-flash`, including scene-plan keyframes.
+- `agnes_video`: text-to-video, image-to-video, and two-or-more-keyframe
+  animation with `agnes-video-v2.0`.
+- `agnes_vision`: OCR, image description, and structured visual extraction with
+  `agnes-2.5-flash`, especially when Prime's reasoning model has no vision.
+
+#### Current integration boundary
+
+- Image and video generation enter through the existing scored
+  `image_selector` and `video_selector`; Agnes is not hard-coded as the default.
+- OCR/image understanding is exposed only in visual pipeline stages such as
+  report intake, scene planning, asset work, and visual QA.
+- Agnes video requires public image URLs for image-to-video/keyframe requests;
+  OpenMontage does not silently upload local private assets.
+- The current official documentation does not provide a stable video-
+  understanding contract, so `agnes_vision` intentionally accepts images only.
+- Account quotas and pricing can change. OpenMontage records the provider/model
+  used but does not claim a permanent free tier.
+
+**Official references:** [Image 2.1 Flash](https://wiki.agnes-ai.com/en/docs/agnes-image-21-flash.md),
+[Video 2.0](https://wiki.agnes-ai.com/en/docs/agnes-video-v20.md), and
+[Agnes 2.5 Flash](https://wiki.agnes-ai.com/en/docs/agnes-25-flash.md).
+
+---
 
 ### xAI — Grok Image + Video
 
