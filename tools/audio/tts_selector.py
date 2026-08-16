@@ -61,6 +61,10 @@ class TTSSelector(BaseTool):
                 "type": "number", "minimum": 0, "maximum": 1,
                 "description": "Style exaggeration (ElevenLabs). Higher = more expressive.",
             },
+            "style_instruction": {
+                "type": "string",
+                "description": "Natural-language delivery direction for providers such as MiMo.",
+            },
             "output_format": {
                 "type": "string",
                 "description": "Audio output format (e.g. mp3_44100_128). Passed through to provider.",
@@ -68,10 +72,10 @@ class TTSSelector(BaseTool):
             "preferred_provider": {
                 "type": "string",
                 "description": (
-                    "Provider name or 'auto'. Default is 'minimax' (Token Plan TTS) when available; "
+                    "Provider name or 'auto'. Default is 'mimo' (active Token Plan TTS) when available; "
                     "falls back to scored ranking if unavailable. Valid values are discovered at runtime."
                 ),
-                "default": "minimax",
+                "default": "mimo",
             },
             "allowed_providers": {
                 "type": "array",
@@ -166,11 +170,15 @@ class TTSSelector(BaseTool):
         """Select the best TTS provider using scored ranking."""
         from lib.scoring import rank_providers
 
-        # Alan policy 2026-07-15: default preferred_provider=minimax (Token Plan).
-        preferred = inputs.get("preferred_provider") or "minimax"
+        # Alan policy 2026-08-16: MiMo-V2.5-TTS replaces MiniMax for narration.
+        preferred = inputs.get("preferred_provider") or "mimo"
         allowed = set(inputs.get("allowed_providers") or [])
         if allowed:
             candidates = [tool for tool in candidates if tool.provider in allowed]
+        elif preferred == "mimo":
+            # MiniMax TTS is retired from Alan's default narration chain. It remains
+            # available only when explicitly requested, not as a silent fallback.
+            candidates = [tool for tool in candidates if tool.provider != "minimax"]
 
         rankings = rank_providers(candidates, task_context)
 
