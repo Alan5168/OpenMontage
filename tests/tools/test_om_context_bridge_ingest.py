@@ -7,6 +7,16 @@ import json
 from tools import om_context_bridge as bridge
 
 
+def test_emit_is_ascii_safe_and_round_trips_chinese(capsys):
+    payload = {"query": "身体受到威胁，闭嘴，锁镜头"}
+
+    bridge._emit(payload)
+
+    emitted = capsys.readouterr().out
+    emitted.encode("ascii")
+    assert json.loads(emitted) == payload
+
+
 def test_ingest_calls_add_resource_before_claiming_success(tmp_path, monkeypatch, capsys):
     source = tmp_path / "probe.md"
     source.write_text("semantic probe nonce", encoding="utf-8")

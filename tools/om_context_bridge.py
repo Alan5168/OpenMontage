@@ -65,8 +65,13 @@ def _sha256_bytes(data: bytes) -> str:
 
 
 def _emit(payload: dict[str, Any]) -> None:
-    """统一 JSON 输出"""
-    sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2))
+    """Emit console-codepage-independent JSON for nested Windows agents."""
+    # The bridge is often launched by another Python process on Windows.  The
+    # child stdout code page may be GBK even when the parent requests UTF-8,
+    # which previously turned Chinese query evidence into mojibake.  ASCII-safe
+    # JSON preserves the exact Unicode payload after json.loads on every code
+    # page without changing OpenViking's Unicode argv.
+    sys.stdout.write(json.dumps(payload, ensure_ascii=True, indent=2))
     sys.stdout.write("\n")
 
 
