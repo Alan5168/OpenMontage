@@ -160,6 +160,41 @@ def _ov_scope_exists(viking_uri: str) -> tuple[bool, dict[str, Any]]:
     }
 
 
+def _ov_semantic_probe() -> tuple[bool, dict[str, Any]]:
+    """Prove that vector retrieval works; process health and `ls` are insufficient."""
+    uri = f"{VIKING_PREFIX}{SCOPE_DIRS['goodcase']}/reference-atoms/"
+    query = "body under threat locked camera micro movement"
+    try:
+        code, stdout, stderr = _ov_cli(
+            ["find", query, "-u", uri, "-n", "1"], timeout=35
+        )
+    except Exception as exc:
+        return False, {"error": f"{type(exc).__name__}: {exc}", "uri": uri}
+    parsed = _parse_ov_json(stdout)
+    result = parsed.get("result") if isinstance(parsed, dict) else None
+    if isinstance(parsed, dict) and parsed.get("ok") is True and isinstance(result, dict):
+        parsed = result
+    hits: list[Any] = []
+    if isinstance(parsed, dict):
+        raw_hits = (
+            parsed.get("resources")
+            or parsed.get("results")
+            or parsed.get("items")
+            or parsed.get("hits")
+            or []
+        )
+        if isinstance(raw_hits, list):
+            hits = raw_hits
+    ok = code == 0 and bool(hits)
+    return ok, {
+        "uri": uri,
+        "query": query,
+        "exit_code": code,
+        "hit_count": len(hits),
+        "stderr": stderr[-500:],
+    }
+
+
 def cmd_search(args: argparse.Namespace) -> None:
     """真实调用 OpenViking 0.4.13 `ov find`，禁止用目录 grep 冒充。"""
     ov_ok, ov_detail = _http_ok(f"{OV_HTTP}/health")
@@ -460,6 +495,8 @@ def cmd_health(args: argparse.Namespace) -> None:
         if scope in required_semantic_scopes:
             semantic_scopes_ok = semantic_scopes_ok and scope_ok
 
+    semantic_probe_ok, semantic_probe = _ov_semantic_probe()
+
     overall = "OK" if (
         ov_ok
         and not missing_dirs
@@ -467,6 +504,7 @@ def cmd_health(args: argparse.Namespace) -> None:
         and cli_ok
         and qdrant_ok
         and semantic_scopes_ok
+        and semantic_probe_ok
     ) else "FAIL"
     _emit({
         "status": overall,
@@ -486,6 +524,8 @@ def cmd_health(args: argparse.Namespace) -> None:
             "grep_search_disabled": True,
             "semantic_scopes": semantic_scopes,
             "semantic_scopes_ok": semantic_scopes_ok,
+            "semantic_probe": semantic_probe,
+            "semantic_probe_ok": semantic_probe_ok,
         },
         "qdrant": {
             "reachable": qdrant_ok,

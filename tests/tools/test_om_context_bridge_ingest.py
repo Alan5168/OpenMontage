@@ -17,6 +17,54 @@ def test_emit_is_ascii_safe_and_round_trips_chinese(capsys):
     assert json.loads(emitted) == payload
 
 
+def test_semantic_probe_requires_a_real_vector_hit(monkeypatch):
+    monkeypatch.setattr(
+        bridge,
+        "_ov_cli",
+        lambda args, timeout=60: (
+            0,
+            json.dumps(
+                {
+                    "ok": True,
+                    "result": {
+                        "resources": [
+                            {
+                                "uri": "viking://resources/content-studio/goodcases/"
+                                "reference-atoms/a.json/a.md",
+                                "score": 0.8,
+                            }
+                        ]
+                    },
+                }
+            ),
+            "",
+        ),
+    )
+
+    ok, detail = bridge._ov_semantic_probe()
+
+    assert ok is True
+    assert detail["hit_count"] == 1
+    assert detail["uri"].endswith("/goodcases/reference-atoms/")
+
+
+def test_semantic_probe_rejects_health_without_hits(monkeypatch):
+    monkeypatch.setattr(
+        bridge,
+        "_ov_cli",
+        lambda args, timeout=60: (
+            0,
+            json.dumps({"ok": True, "result": {"resources": []}}),
+            "",
+        ),
+    )
+
+    ok, detail = bridge._ov_semantic_probe()
+
+    assert ok is False
+    assert detail["hit_count"] == 0
+
+
 def test_ingest_calls_add_resource_before_claiming_success(tmp_path, monkeypatch, capsys):
     source = tmp_path / "probe.md"
     source.write_text("semantic probe nonce", encoding="utf-8")
