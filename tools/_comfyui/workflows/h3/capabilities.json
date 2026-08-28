@@ -17,10 +17,10 @@
       "requires_reference_rights": true,
       "requires_adapter_gate": false,
       "model_stack": [
-        {"role": "diffusion", "file": "diffusion_models/MiniMax_H3_FL2VA_pruned_nvfp4.safetensors", "bytes": 12528636865, "sha256": "9d49beb6ac1a7df1211d5d578bd4127810a132bf5536eb3043c358f93f802bd4"},
-        {"role": "text_encoder", "file": "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "bytes": 15687142619, "sha256": "35a88d51fc71d91def860bc4a325b62966203da4322666703754223d39f2c6"},
-        {"role": "video_vae", "file": "vae/minimax_h3_video_vae_fp16.safetensors", "bytes": 5207808496, "sha256": "7c1f1314b1952fd6cd96cb29db3a024dfec8006c2841ab575c0fc575b6e522"},
-        {"role": "audio_vae", "file": "vae/minimax_h3_audio_vae_fp32.safetensors", "bytes": 605254808, "sha256": "8e505d9570f7b8a59ee3a7ad201e919284d2e64d95b6b56a17218a939edb48"}
+        {"role": "diffusion", "file": "diffusion_models/MiniMax_H3_FL2VA_pruned_nvfp4.safetensors", "bytes": 12528636800, "sha256": "9d49beb65ddc373a0df523b8ce715b61b73f88127bf3c8d3ffda76c5dda02bd4"},
+        {"role": "text_encoder", "file": "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "bytes": 15687142551, "sha256": "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6"},
+        {"role": "video_vae", "file": "vae/minimax_h3_video_vae_fp16.safetensors", "bytes": 5207808496, "sha256": "7c1f131492e7eddacaac9069a61b81bdd39de5cc96561e677c5eab1cdce5e522"},
+        {"role": "audio_vae", "file": "vae/minimax_h3_audio_vae_fp32.safetensors", "bytes": 605254808, "sha256": "8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48"}
       ],
       "rights_policy": "owned_or_licensed_reference"
     },
@@ -37,8 +37,8 @@
       "requires_reference_rights": true,
       "requires_adapter_gate": false,
       "model_stack": [
-        {"role": "diffusion", "file": "diffusion_models/MiniMax_H3_FL2VA_pruned_nvfp4.safetensors", "bytes": 12528636865, "sha256": "9d49beb6ac1a7df1211d5d578bd4127810a132bf5536eb3043c358f93f802bd4"},
-        {"role": "lora", "file": "loras/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "bytes": 620285592, "sha256": "7098acf3d2688823bc86fa609b6b185627e5ce1e8c5c9945ffb1e5c7132fe409"}
+        {"role": "diffusion", "file": "diffusion_models/MiniMax_H3_FL2VA_pruned_nvfp4.safetensors", "bytes": 12528636800, "sha256": "9d49beb65ddc373a0df523b8ce715b61b73f88127bf3c8d3ffda76c5dda02bd4"},
+        {"role": "lora", "file": "loras/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "bytes": 620285592, "sha256": "7098acf3ee75028fd9fcd948f50fcc8d995057fabb76f86bd3ca2c0ffc58e409"}
       ],
       "experiment_defaults": {"steps": [6, 8], "strength": 1.0, "sampler": "euler", "scheduler": "beta"},
       "rights_policy": "owned_or_licensed_reference"
@@ -57,9 +57,9 @@
       "requires_adapter_gate": true,
       "model_stack": [
         {"role": "diffusion", "file": "diffusion_models/minimax_h3_ref2va_pruned_nvfp4.safetensors", "bytes": 12528636800, "sha256": "8eea02f43902e69904990c4405968d01a13c6656aa392d37ab80331e79b5df2f"},
-        {"role": "text_encoder", "file": "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "bytes": 15687142619, "sha256": "35a88d51fc71d91def860bc4a325b62966203da4322666703754223d39f2c6"},
-        {"role": "video_vae", "file": "vae/minimax_h3_video_vae_fp16.safetensors", "bytes": 5207808496, "sha256": "7c1f1314b1952fd6cd96cb29db3a024dfec8006c2841ab575c0fc575b6e522"},
-        {"role": "audio_vae", "file": "vae/minimax_h3_audio_vae_fp32.safetensors", "bytes": 605254808, "sha256": "8e505d9570f7b8a59ee3a7ad201e919284d2e64d95b6b56a17218a939edb48"}
+        {"role": "text_encoder", "file": "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "bytes": 15687142551, "sha256": "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6"},
+        {"role": "video_vae", "file": "vae/minimax_h3_video_vae_fp16.safetensors", "bytes": 5207808496, "sha256": "7c1f131492e7eddacaac9069a61b81bdd39de5cc96561e677c5eab1cdce5e522"},
+        {"role": "audio_vae", "file": "vae/minimax_h3_audio_vae_fp32.safetensors", "bytes": 605254808, "sha256": "8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48"}
       ],
       "runtime_policy": "8190_isolated_only_until_16gb_smoke_passes",
       "rights_policy": "owned_or_licensed_reference"
