@@ -9,6 +9,8 @@
       "role": "render",
       "operation": "image_to_video",
       "workflow": "tools/_comfyui/workflows/minimax-h3-i2v.json",
+      "workflow_format": "comfyui_api",
+      "api_runnable": true,
       "output_node": "16",
       "explicit_only": false,
       "previs_only": false,
@@ -27,6 +29,8 @@
       "role": "render_experiment",
       "operation": "image_to_video",
       "workflow": null,
+      "workflow_format": null,
+      "api_runnable": false,
       "output_node": null,
       "explicit_only": true,
       "previs_only": false,
@@ -44,6 +48,8 @@
       "role": "render_experiment",
       "operation": "image_to_video",
       "workflow": null,
+      "workflow_format": null,
+      "api_runnable": false,
       "output_node": null,
       "explicit_only": true,
       "previs_only": false,
@@ -63,6 +69,8 @@
       "role": "previs",
       "operation": "image_to_video",
       "workflow": "runtime/h3/H3_Cinematic_Multishot_Coverage.json",
+      "workflow_format": "comfyui_ui",
+      "api_runnable": false,
       "workflow_sha256": "9fe92e6f6fb6ab5abc217660ffee52335b40ab015a186ad24d55949d8dedd1fb",
       "output_node": "20",
       "explicit_only": true,
@@ -74,6 +82,7 @@
         {"role": "diffusion", "file": "diffusion_models/minimax_h3_ref2va_pruned_nvfp4.safetensors", "bytes": 12528636800, "sha256": "8eea02f43902e69904990c4405968d01a13c6656aa392d37ab80331e79b5df2f"}
       ],
       "runtime_policy": "8190_isolated_previs_only",
+      "promotion_gate": "export_and_pin_api_workflow_then_run_16gb_smoke",
       "rights_policy": "owned_or_licensed_reference"
     }
   }

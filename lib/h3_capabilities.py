@@ -75,6 +75,10 @@ def compile_dispatch(
     output_node = capability.get("output_node")
     if not workflow or not output_node:
         raise H3CapabilityError(f"capability has no pinned runnable workflow: {selected}")
+    if not capability.get("api_runnable"):
+        raise H3CapabilityError(
+            f"capability workflow is not an API-format OM dispatch asset: {selected}"
+        )
 
     workflow_path = _resolve_workflow_path(workflow, runtime_root=runtime_root)
     return {

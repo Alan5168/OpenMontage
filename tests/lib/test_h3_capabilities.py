@@ -61,6 +61,17 @@ def test_multishot_cannot_be_final_asset():
         )
 
 
+def test_multishot_ui_workflow_cannot_be_dispatched_by_om():
+    with pytest.raises(H3CapabilityError, match="not an API-format"):
+        compile_dispatch(
+            ROUTE,
+            capability_id="h3.ref2va.multishot_previs",
+            reference_provenance={"rights": "licensed"},
+            adapter_gate_pass=True,
+            final_asset=False,
+        )
+
+
 def test_health_is_profile_specific(tmp_path: Path):
     manifest = {
         "schema_version": "1.0",
