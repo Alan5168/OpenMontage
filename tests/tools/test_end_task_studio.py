@@ -108,6 +108,16 @@ class EndTaskStudioTests(unittest.TestCase):
         self.assertEqual(set(document["active_handoffs"]), {f"job-{index}" for index in range(8)})
         self.assertEqual(document["revision"], 8)
 
+    def test_reupsert_one_job_preserves_the_other(self) -> None:
+        hot = self.root / "current_task_context.json"
+        self.assertEqual(run_upsert(hot, "job-a", focus=True).returncode, 0)
+        self.assertEqual(run_upsert(hot, "job-b").returncode, 0)
+        before = json.loads(hot.read_text(encoding="utf-8"))["active_handoffs"]["job-b"]
+        self.assertEqual(run_upsert(hot, "job-a", focus=True).returncode, 0)
+        document = json.loads(hot.read_text(encoding="utf-8"))
+        self.assertEqual(document["active_handoffs"]["job-b"], before)
+        self.assertEqual(document["focus_job_id"], "job-a")
+
     def test_atomic_replace_failure_preserves_original(self) -> None:
         hot = self.root / "current_task_context.json"
         original = b'{"safe": true}\n'
