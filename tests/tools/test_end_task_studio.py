@@ -4,6 +4,8 @@ import importlib.util
 import json
 import subprocess
 import sys
+import tempfile
+import unittest
 from pathlib import Path
 from unittest import mock
 
@@ -33,112 +35,117 @@ def run_upsert(hot: Path, job_id: str, *, focus: bool = False) -> subprocess.Com
         "--next-action",
         f"next {job_id}",
         "--saved-by",
-        "pytest",
+        "unittest",
     ]
     if focus:
         command.append("--set-focus")
     return subprocess.run(command, text=True, capture_output=True, check=False)
 
 
-def test_legacy_singleton_is_migrated_without_loss(tmp_path: Path) -> None:
-    hot = tmp_path / "current_task_context.json"
-    hot.write_text(
-        json.dumps(
-            {
-                "timestamp": "2026-09-01T11:43:17+08:00",
-                "task": "Comfy memory governance",
-                "job_id": "sys-comfy",
-                "summary": "legacy summary",
-                "pending_gate": "RESTART",
-                "next_action": "restart Windows",
-                "saved_by": "codex",
-            }
-        ),
-        encoding="utf-8",
-    )
-    result = run_upsert(hot, "h3-sandbox", focus=True)
-    assert result.returncode == 0, result.stderr + result.stdout
-    document = json.loads(hot.read_text(encoding="utf-8"))
-    assert document["schema_version"] == 2
-    assert set(document["active_handoffs"]) == {"sys-comfy", "h3-sandbox"}
-    assert document["active_handoffs"]["sys-comfy"]["pending_gate"] == "RESTART"
-    assert document["focus_job_id"] == "h3-sandbox"
+class EndTaskStudioTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp_dir.name)
 
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
 
-def test_concurrent_writers_do_not_lose_jobs(tmp_path: Path) -> None:
-    hot = tmp_path / "current_task_context.json"
-    processes = [
-        subprocess.Popen(
+    def test_legacy_singleton_is_migrated_without_loss(self) -> None:
+        hot = self.root / "current_task_context.json"
+        hot.write_text(
+            json.dumps(
+                {
+                    "timestamp": "2026-09-01T11:43:17+08:00",
+                    "task": "Comfy memory governance",
+                    "job_id": "sys-comfy",
+                    "summary": "legacy summary",
+                    "pending_gate": "RESTART",
+                    "next_action": "restart Windows",
+                    "saved_by": "codex",
+                }
+            ),
+            encoding="utf-8",
+        )
+        result = run_upsert(hot, "h3-sandbox", focus=True)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        document = json.loads(hot.read_text(encoding="utf-8"))
+        self.assertEqual(document["schema_version"], 2)
+        self.assertEqual(set(document["active_handoffs"]), {"sys-comfy", "h3-sandbox"})
+        self.assertEqual(document["active_handoffs"]["sys-comfy"]["pending_gate"], "RESTART")
+        self.assertEqual(document["focus_job_id"], "h3-sandbox")
+
+    def test_concurrent_writers_do_not_lose_jobs(self) -> None:
+        hot = self.root / "current_task_context.json"
+        processes = [
+            subprocess.Popen(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "upsert",
+                    "--hot-file",
+                    str(hot),
+                    "--no-sync",
+                    "--task",
+                    f"Task {index}",
+                    "--job-id",
+                    f"job-{index}",
+                    "--summary",
+                    "concurrency probe",
+                    "--next-action",
+                    "continue",
+                    "--saved-by",
+                    "unittest",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            for index in range(8)
+        ]
+        results = [process.communicate(timeout=20) + (process.returncode,) for process in processes]
+        self.assertTrue(all(returncode == 0 for _stdout, _stderr, returncode in results), results)
+        document = json.loads(hot.read_text(encoding="utf-8"))
+        self.assertEqual(set(document["active_handoffs"]), {f"job-{index}" for index in range(8)})
+        self.assertEqual(document["revision"], 8)
+
+    def test_atomic_replace_failure_preserves_original(self) -> None:
+        hot = self.root / "current_task_context.json"
+        original = b'{"safe": true}\n'
+        hot.write_bytes(original)
+        with mock.patch.object(MODULE.os, "replace", side_effect=OSError("injected")):
+            with self.assertRaises(OSError):
+                MODULE._atomic_write_json(hot, {"safe": False})
+        self.assertEqual(hot.read_bytes(), original)
+        self.assertFalse(list(self.root.glob(".current_task_context.json.*.tmp")))
+
+    def test_close_is_bounded_and_retargets_focus(self) -> None:
+        hot = self.root / "current_task_context.json"
+        self.assertEqual(run_upsert(hot, "job-a", focus=True).returncode, 0)
+        self.assertEqual(run_upsert(hot, "job-b").returncode, 0)
+        result = subprocess.run(
             [
                 sys.executable,
                 str(SCRIPT),
-                "upsert",
+                "close",
                 "--hot-file",
                 str(hot),
                 "--no-sync",
-                "--task",
-                f"Task {index}",
                 "--job-id",
-                f"job-{index}",
-                "--summary",
-                "concurrency probe",
-                "--next-action",
-                "continue",
-                "--saved-by",
-                "pytest",
+                "job-a",
+                "--reason",
+                "complete",
             ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
             text=True,
+            capture_output=True,
+            check=False,
         )
-        for index in range(8)
-    ]
-    results = [process.communicate(timeout=20) + (process.returncode,) for process in processes]
-    assert all(returncode == 0 for _stdout, _stderr, returncode in results), results
-    document = json.loads(hot.read_text(encoding="utf-8"))
-    assert set(document["active_handoffs"]) == {f"job-{index}" for index in range(8)}
-    assert document["revision"] == 8
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        document = json.loads(hot.read_text(encoding="utf-8"))
+        self.assertNotIn("job-a", document["active_handoffs"])
+        self.assertEqual(document["focus_job_id"], "job-b")
+        self.assertEqual(document["recent_closed"][0]["job_id"], "job-a")
 
 
-def test_atomic_replace_failure_preserves_original(tmp_path: Path) -> None:
-    hot = tmp_path / "current_task_context.json"
-    original = b'{"safe": true}\n'
-    hot.write_bytes(original)
-    with mock.patch.object(MODULE.os, "replace", side_effect=OSError("injected")):
-        try:
-            MODULE._atomic_write_json(hot, {"safe": False})
-        except OSError:
-            pass
-        else:
-            raise AssertionError("expected injected replace failure")
-    assert hot.read_bytes() == original
-    assert not list(tmp_path.glob(".current_task_context.json.*.tmp"))
-
-
-def test_close_is_bounded_and_retargets_focus(tmp_path: Path) -> None:
-    hot = tmp_path / "current_task_context.json"
-    assert run_upsert(hot, "job-a", focus=True).returncode == 0
-    assert run_upsert(hot, "job-b").returncode == 0
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(SCRIPT),
-            "close",
-            "--hot-file",
-            str(hot),
-            "--no-sync",
-            "--job-id",
-            "job-a",
-            "--reason",
-            "complete",
-        ],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr + result.stdout
-    document = json.loads(hot.read_text(encoding="utf-8"))
-    assert "job-a" not in document["active_handoffs"]
-    assert document["focus_job_id"] == "job-b"
-    assert document["recent_closed"][0]["job_id"] == "job-a"
+if __name__ == "__main__":
+    unittest.main()
 
