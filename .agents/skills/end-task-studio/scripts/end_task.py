@@ -38,6 +38,15 @@ class HotMemoryError(RuntimeError):
     """Fail-closed hot memory error."""
 
 
+def _configure_stdio() -> None:
+    """Make receipts portable across Windows frontends that assume UTF-8 pipes."""
+
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
+
+
 def _now_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).astimezone().isoformat(timespec="seconds")
 
@@ -344,6 +353,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _configure_stdio()
     argv = list(sys.argv[1:] if argv is None else argv)
     # Backward compatibility with the legacy script's no-subcommand invocation.
     if argv and argv[0] not in {"upsert", "close", "show", "verify", "-h", "--help"}:
