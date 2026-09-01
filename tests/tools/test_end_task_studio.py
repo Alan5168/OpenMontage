@@ -118,6 +118,11 @@ class EndTaskStudioTests(unittest.TestCase):
         self.assertEqual(hot.read_bytes(), original)
         self.assertFalse(list(self.root.glob(".current_task_context.json.*.tmp")))
 
+    def test_semantic_hash_tolerates_openviking_trailing_newline_normalization(self) -> None:
+        with_newline = '{"job_id":"a","summary":"中文"}\n'
+        without_newline = '{"job_id":"a","summary":"中文"}'
+        self.assertEqual(MODULE._semantic_json_sha(with_newline), MODULE._semantic_json_sha(without_newline))
+
     def test_close_is_bounded_and_retargets_focus(self) -> None:
         hot = self.root / "current_task_context.json"
         self.assertEqual(run_upsert(hot, "job-a", focus=True).returncode, 0)
@@ -148,4 +153,3 @@ class EndTaskStudioTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

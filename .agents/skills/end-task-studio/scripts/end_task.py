@@ -46,6 +46,14 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _semantic_json_sha(text: str) -> str:
+    """Hash JSON meaning; OpenViking strips the final newline on content/write."""
+
+    value = json.loads(text)
+    canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return _sha256_bytes(canonical.encode("utf-8"))
+
+
 def _unique_bounded(old: list[str], new: list[str]) -> list[str]:
     values: list[str] = []
     for item in [*old, *new]:
@@ -262,11 +270,13 @@ def _sync_and_verify(content: bytes) -> dict[str, Any]:
     remote_content = read_result.get("result")
     if not isinstance(remote_content, str):
         raise HotMemoryError("OpenViking readback did not return string content")
-    local_sha = _sha256_bytes(content)
-    remote_sha = _sha256_bytes(remote_content.encode("utf-8"))
+    local_sha = _semantic_json_sha(text)
+    remote_sha = _semantic_json_sha(remote_content)
     if local_sha != remote_sha:
-        raise HotMemoryError(f"OpenViking readback hash mismatch: local={local_sha} remote={remote_sha}")
-    return {"write_result": write_result.get("status"), "remote_sha256": remote_sha}
+        raise HotMemoryError(
+            f"OpenViking semantic readback hash mismatch: local={local_sha} remote={remote_sha}"
+        )
+    return {"write_result": write_result.get("status"), "remote_semantic_sha256": remote_sha}
 
 
 def _write_mutation(path: Path, mutate: Any) -> tuple[dict[str, Any], bytes]:
