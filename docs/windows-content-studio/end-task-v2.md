@@ -11,8 +11,9 @@ and not the durable production record.
   verify the readback hash.
 - Closing a job moves it into a five-entry `recent_closed` window. Full history
   remains in the job and OpenMontage evidence, so the hot file stays small.
-- Runtime skill copies are generated from `.agents/skills/end-task-studio` and
-  must match its recorded SHA-256 hashes.
+- Runtime skill copies for the shared agent root, Cursor, Gemini/Antigravity, Pi,
+  Hermes, QoderWork, Qwen Office, and WorkBuddy are generated from
+  `.agents/skills/end-task-studio` and must match its recorded SHA-256 hashes.
 
 The deterministic entry point is:
 
@@ -25,4 +26,3 @@ The installer is:
 ```text
 .agents/skills/end-task-studio/scripts/install_runtime_copies.py
 ```
-

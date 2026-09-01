@@ -12,8 +12,14 @@ from pathlib import Path
 
 
 DEFAULT_TARGETS = [
+    Path(r"C:\Users\ligua\.agents\skills\end-task-studio"),
     Path(r"C:\Users\ligua\.cursor\skills\end-task-studio"),
     Path(r"C:\Users\ligua\.gemini\config\skills\end-task"),
+    Path(r"C:\Users\ligua\.pi\agent\skills\end-task-studio"),
+    Path(r"C:\Users\ligua\.hermes\skills\end-task-studio"),
+    Path(r"C:\Users\ligua\.qoderworkcn\skills\end-task-studio"),
+    Path(r"C:\Users\ligua\.qwenworkcn\skills\end-task-studio"),
+    Path(r"C:\Users\ligua\.workbuddy\skills\end-task-studio"),
 ]
 
 
@@ -63,4 +69,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
