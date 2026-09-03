@@ -18,6 +18,14 @@
       "animation_class": "LIMITED",
       "character_ids": ["jesse"],
       "costume_ids": ["jesse-kitchen-01"],
+      "character_variant": {
+        "character_id": "jesse",
+        "phase": "kitchen",
+        "costume": "jesse-kitchen-01",
+        "view": "front_3q",
+        "must_show": "same face; crumpled note in left hand; not a banquet look",
+        "still_refs": ["bible/jesse/sheets/kitchen_3q.png"]
+      },
       "start_frame_ref": "bible/jesse/approved/idle_doorway.png",
       "end_frame_ref": "bible/jesse/approved/note_raised.png",
       "primary_model": "pending-master-sheet",

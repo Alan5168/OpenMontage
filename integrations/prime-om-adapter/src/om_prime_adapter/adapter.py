@@ -27,6 +27,22 @@ from lib.checkpoint import (  # noqa: E402
 )
 from schemas.artifacts import validate_artifact  # noqa: E402
 
+from .production import (
+    build_production_world,
+    compile_cut_proposal,
+    complete_observation as write_complete_observation,
+    compose_scene_request,
+    dispatch_bounded_repair as write_bounded_repair,
+    dispatch_cut_request,
+    get_human_preference as read_human_preference,
+    produce_keyframe as write_keyframe,
+    propose_bounded_repair as write_bounded_repair_proposal,
+    propose_identity_candidates as write_identity_candidates,
+    record_human_preference as write_human_preference,
+    submit_prerequisite_plan as write_prerequisite_plan,
+    submit_scene_proposal as write_scene_proposal,
+    submit_revision_proposal as write_revision_proposal,
+)
 from .schemas import JOB_REF_SCHEMA, LESSON_SCHEMA, STAGE_PACK_SCHEMA
 from .security import (
     AdapterError,
@@ -158,7 +174,11 @@ def open_job(job_id: str) -> dict[str, Any]:
         "artifact_refs": artifact_refs,
         "canonical_owner": "openmontage",
         "prime_may_write_project_state": False,
+        "generate": False,
     }
+    world = build_production_world(job_id, project_dir, root, checkpoint=checkpoint)
+    payload["production_world"] = world
+    payload["next_step"] = world.get("next_step")
     jsonschema.validate(payload, JOB_REF_SCHEMA)
     scan_secrets(payload)
     return payload
@@ -224,6 +244,11 @@ def _stage_slice(stage: str, artifact_name: str, artifact: dict[str, Any]) -> di
                     "image_result_kind": (scene.get("visual_ref") or {}).get("kind"),
                     "dialogue": scene.get("dialogue"),
                     "review_decision": scene.get("review_decision"),
+                    "animation_class": scene.get("animation_class"),
+                    "motion_obligation": scene.get("motion_obligation"),
+                    "performance_intent": scene.get("performance_intent"),
+                    "intentional_hold": scene.get("intentional_hold"),
+                    "character_ids": scene.get("character_ids") or [],
                 }
             )
         return {"scene_count": len(scenes), "scenes": scenes}
@@ -407,6 +432,219 @@ def record_lesson_candidate(job_id: str, lesson: dict[str, Any]) -> dict[str, An
         "ledger": display_rel(ledger_path, root),
         "error_class": lesson.get("error_class"),
     }
+
+
+def compile_cut(
+    job_id: str,
+    shot_id: str,
+    *,
+    caller: str = PRIME_CALLER,
+    write: bool = True,
+) -> dict[str, Any]:
+    """Compile one shot to an OM-owned execution proposal. Does not generate media."""
+    root = authorized_root()
+    project_dir = _job_dir(job_id, root)
+    marker_path = project_dir / "project.json"
+    if not marker_path.is_file():
+        raise AdapterError(f"Unknown job: {job_id}")
+    return compile_cut_proposal(
+        job_id,
+        shot_id,
+        project_dir,
+        root,
+        caller=caller,
+        write=write,
+    )
+
+
+def dispatch_cut(
+    job_id: str,
+    shot_id: str,
+    *,
+    caller: str = PRIME_CALLER,
+    generate: bool | None = None,
+) -> dict[str, Any]:
+    """Prime requests execution. OM revalidates the proposal and runs the provider."""
+    root = authorized_root()
+    project_dir = _job_dir(job_id, root)
+    marker_path = project_dir / "project.json"
+    if not marker_path.is_file():
+        raise AdapterError(f"Unknown job: {job_id}")
+    return dispatch_cut_request(
+        job_id,
+        shot_id,
+        project_dir,
+        root,
+        caller=caller,
+        generate=generate,
+    )
+
+
+def compose_scene(
+    job_id: str,
+    *,
+    caller: str = PRIME_CALLER,
+) -> dict[str, Any]:
+    """Prime requests scene concat. OM writes composed mp4 + REVIEW_QUEUE."""
+    root = authorized_root()
+    project_dir = _job_dir(job_id, root)
+    marker_path = project_dir / "project.json"
+    if not marker_path.is_file():
+        raise AdapterError(f"Unknown job: {job_id}")
+    return compose_scene_request(
+        job_id,
+        project_dir,
+        root,
+        caller=caller,
+    )
+
+
+def submit_prerequisite_plan(
+    job_id: str,
+    *,
+    caller: str = PRIME_CALLER,
+    from_rollout_id: str | None = None,
+) -> dict[str, Any]:
+    root = authorized_root()
+    project_dir = _job_dir(job_id, root)
+    if not (project_dir / "project.json").is_file():
+        raise AdapterError(f"Unknown job: {job_id}")
+    return write_prerequisite_plan(
+        job_id, project_dir, root, caller=caller, from_rollout_id=from_rollout_id
+    )
+
+
+def propose_identity_candidates(
+    job_id: str,
+    *,
+    caller: str = PRIME_CALLER,
+    generate: bool = True,
+) -> dict[str, Any]:
+    root = authorized_root()
+    project_dir = _job_dir(job_id, root)
+    if not (project_dir / "project.json").is_file():
+        raise AdapterError(f"Unknown job: {job_id}")
+    return write_identity_candidates(job_id, project_dir, root, caller=caller, generate=generate)
+
+
+def produce_keyframe(
+    job_id: str,
+    shot_id: str,
+    *,
+    caller: str = PRIME_CALLER,
+) -> dict[str, Any]:
+    root = authorized_root()
+    project_dir = _job_dir(job_id, root)
+    if not (project_dir / "project.json").is_file():
+        raise AdapterError(f"Unknown job: {job_id}")
+    return write_keyframe(job_id, shot_id, project_dir, root, caller=caller)
+
+
+def propose_bounded_repair(
+    job_id: str,
+    parent_rollout_id: str,
+    *,
+    caller: str = PRIME_CALLER,
+    actions: list[str] | None = None,
+) -> dict[str, Any]:
+    root = authorized_root()
+    project_dir = _job_dir(job_id, root)
+    if not (project_dir / "project.json").is_file():
+        raise AdapterError(f"Unknown job: {job_id}")
+    return write_bounded_repair_proposal(
+        job_id,
+        parent_rollout_id,
+        project_dir,
+        root,
+        caller=caller,
+        actions=actions,
+    )
+
+
+def dispatch_bounded_repair(
+    job_id: str,
+    parent_rollout_id: str,
+    *,
+    caller: str = PRIME_CALLER,
+) -> dict[str, Any]:
+    root = authorized_root()
+    project_dir = _job_dir(job_id, root)
+    if not (project_dir / "project.json").is_file():
+        raise AdapterError(f"Unknown job: {job_id}")
+    return write_bounded_repair(
+        job_id,
+        parent_rollout_id,
+        project_dir,
+        root,
+        caller=caller,
+    )
+
+
+def complete_observation(
+    job_id: str,
+    rollout_id: str,
+    *,
+    caller: str = PRIME_CALLER,
+) -> dict[str, Any]:
+    root = authorized_root()
+    project_dir = _job_dir(job_id, root)
+    if not (project_dir / "project.json").is_file():
+        raise AdapterError(f"Unknown job: {job_id}")
+    return write_complete_observation(
+        job_id,
+        rollout_id,
+        project_dir,
+        root,
+        caller=caller,
+    )
+
+
+def submit_scene_proposal(
+    job_id: str,
+    proposal: dict[str, Any],
+    *,
+    caller: str = PRIME_CALLER,
+) -> dict[str, Any]:
+    root = authorized_root()
+    project_dir = _job_dir(job_id, root)
+    if not (project_dir / "project.json").is_file():
+        raise AdapterError(f"Unknown job: {job_id}")
+    return write_scene_proposal(job_id, proposal, project_dir, root, caller=caller)
+
+
+def submit_revision_proposal(
+    job_id: str,
+    proposal: dict[str, Any],
+    *,
+    caller: str = PRIME_CALLER,
+) -> dict[str, Any]:
+    root = authorized_root()
+    project_dir = _job_dir(job_id, root)
+    if not (project_dir / "project.json").is_file():
+        raise AdapterError(f"Unknown job: {job_id}")
+    return write_revision_proposal(job_id, proposal, project_dir, root, caller=caller)
+
+
+def record_human_preference(
+    job_id: str,
+    label: str,
+    *,
+    caller: str,
+    target: str | None = None,
+) -> dict[str, Any]:
+    root = authorized_root()
+    project_dir = _job_dir(job_id, root)
+    if not (project_dir / "project.json").is_file():
+        raise AdapterError(f"Unknown job: {job_id}")
+    return write_human_preference(
+        job_id, label, project_dir, root, caller=caller, target=target
+    )
+
+
+def get_human_preference(job_id: str) -> dict[str, Any] | None:
+    root = authorized_root()
+    project_dir = _job_dir(job_id, root)
+    return read_human_preference(project_dir)
 
 
 def get_gate(job_id: str) -> dict[str, Any]:

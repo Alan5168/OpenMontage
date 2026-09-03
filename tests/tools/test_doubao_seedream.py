@@ -36,6 +36,7 @@ def test_generation_records_sceneplan_provenance(monkeypatch, tmp_path) -> None:
         assert request.full_url.endswith("/images/generations")
         payload = json.loads(request.data.decode("utf-8"))
         assert payload["model"] == "doubao-seedream-5.0-lite"
+        assert payload["size"] == "1080x1920"
         assert payload["seed"] == 42
         return FakeResponse({
             "request_id": "req-fixture",
@@ -57,3 +58,26 @@ def test_generation_records_sceneplan_provenance(monkeypatch, tmp_path) -> None:
     assert result.data["request_id"] == "req-fixture"
     assert len(result.data["output_hashes"][0]) == 64
     assert result.data["license_policy"]
+
+
+def test_seedream_bumps_identity_plate_below_min_pixels(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("ARK_AGENTPLAN_API_KEY", "test-only")
+
+    def fake_urlopen(request, timeout):
+        payload = json.loads(request.data.decode("utf-8"))
+        assert payload["size"] == "1920x1920"
+        return FakeResponse({
+            "request_id": "req-size",
+            "data": [{"b64_json": base64.b64encode(b"png").decode("ascii")}],
+        })
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    result = DoubaoSeedream().execute({
+        "prompt": "plate",
+        "width": 1024,
+        "height": 1024,
+        "output_path": str(tmp_path / "plate.png"),
+        "response_format": "b64_json",
+    })
+    assert result.success is True
+    assert result.data["size"] == "1920x1920"

@@ -26,6 +26,21 @@ def test_independent_mothers_fail_without_package():
     assert result["verdict_tag"].startswith("CONTINUITY_FAIL")
 
 
+def test_world_lock_wardrobe_fails_even_on_single_mother():
+    plan = {
+        "visual_continuity_package": {
+            "generation_mode": "one_mother_edit",
+            "world_lock": {"palette": "warm", "wardrobe": "apron"},
+            "hero_prop_id": "lunchbox",
+            "camera_language": "locked mcu",
+        },
+        "scenes": [{"id": "c01", "t2i_prompt": "mother"}],
+    }
+    result = evaluate_visual_continuity(plan)
+    assert result["status"] == "FAIL"
+    assert "character_variant" in result["reason"]
+
+
 def test_allowed_mode_with_world_lock_passes():
     plan = {
         "visual_continuity_package": {

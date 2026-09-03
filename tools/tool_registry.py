@@ -116,7 +116,12 @@ class ToolRegistry:
                     os.environ[key] = value
 
     def discover(self, package_name: str = "tools") -> list[str]:
-        """Import a package tree and register any concrete tools it defines."""
+        """Import a package tree and register any concrete tools it defines.
+
+        Resilient: a single module that fails to import is skipped with a
+        warning rather than aborting the whole discovery pass. This keeps
+        working tools registered even when an unrelated module is broken.
+        """
         self._load_dotenv()
         package = importlib.import_module(package_name)
         discovered: list[str] = []
@@ -125,10 +130,21 @@ class ToolRegistry:
             return self.register_module(package)
 
         for module_info in pkgutil.walk_packages(package_paths, f"{package.__name__}."):
+            # Skip private modules (convention: _prefix = internal/script, not a tool)
+            module_basename = module_info.name.rsplit(".", 1)[-1]
+            if module_basename.startswith("_"):
+                continue
             if module_info.name.endswith(".base_tool") or module_info.name.endswith(".tool_registry"):
                 continue
-            module = importlib.import_module(module_info.name)
-            discovered.extend(self.register_module(module))
+            try:
+                module = importlib.import_module(module_info.name)
+                discovered.extend(self.register_module(module))
+            except SystemExit:
+                raise
+            except Exception as exc:
+                import sys
+                print(f"[registry] Skipping {module_info.name} during discovery: {exc}", file=sys.stderr)
+                continue
 
         self._discovered_packages.add(package_name)
         return discovered

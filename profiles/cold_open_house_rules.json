@@ -20,12 +20,12 @@
   "cut_routing": {
     "criterion": "Does shot intent require character performance?",
     "no": "LIMITED is legal if Layout, sound, and declared hold/pan are real",
-    "yes": "loop/zoom cannot impersonate performance; I2V_STANDARD or I2V_HARD",
+    "yes": "PERFORMANCE/INTERACTION: H3 default. COMPILE FAIL if LIMITED or local_compose. Retry H3 → video provider → split/repair. Never PNG+ffmpeg loop.",
     "A1": "LIMITED HUD + cue in first second",
     "A2": "LIMITED 1.5-2s hold with sound and correct framing",
     "A3": "LIMITED or H3 micro-reaction; VO is TTS API",
-    "A4": "Layout first, not H3. Character small, perspective and light integrated.",
-    "A5": "H3 candidate",
-    "A6": "H3 candidate"
+    "A4": "Corpus sample. Shot-specific EST layout. LIMITED only if motion_obligation NONE/LOCAL.",
+    "A5": "PERFORMANCE: H3 FL2VA default",
+    "A6": "PERFORMANCE: H3 FL2VA default"
   }
 }

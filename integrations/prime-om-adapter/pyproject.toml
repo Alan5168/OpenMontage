@@ -1,8 +1,11 @@
 [project]
 name = "om-prime-adapter"
-version = "0.1.0"
+version = "0.2.0"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = ["jsonschema"]
+
+[project.scripts]
+om_prime_adapter = "om_prime_adapter.__main__:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -52,7 +52,30 @@ def evaluate_visual_continuity(scene_plan: dict[str, Any]) -> dict[str, Any]:
     reasons: list[str] = []
     status = "PASS"
 
+    if isinstance(world_lock, dict):
+        from lib.character_variant import world_lock_wardrobe_keys
+
+        banned = world_lock_wardrobe_keys(world_lock)
+        if banned:
+            status = "FAIL"
+            reasons.append(
+                "world_lock holds character wardrobe "
+                f"{banned}; put appearance on scenes[].character_variant"
+            )
+
     if len(mothers) <= 1:
+        if status != "PASS":
+            return {
+                "status": "FAIL",
+                "reason": "; ".join(reasons),
+                "reasons": reasons,
+                "mother_count": len(mothers),
+                "generation_mode": mode,
+                "world_lock_present": bool(world_lock),
+                "alan_continuous_animation_ok": alan_ok,
+                "package_present": bool(package),
+                "verdict_tag": "CONTINUITY_FAIL / MUST_REGENERATE_AFTER_CONTRACT",
+            }
         return {
             "status": "PASS",
             "reason": "single_or_zero_mother",

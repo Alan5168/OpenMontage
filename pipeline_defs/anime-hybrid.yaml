@@ -29,9 +29,9 @@ stages:
   - {name: content_architecture, skill: pipelines/anime-hybrid/executive-producer, required_artifacts_in: [research_brief], produces: [content_architecture], tools_available: [], checkpoint_required: true, human_approval_default: false}
   - {name: proposal, skill: pipelines/anime-hybrid/proposal-director, required_artifacts_in: [content_architecture], produces: [proposal_packet, decision_log], tools_available: [], checkpoint_required: true, human_approval_default: false}
   - {name: script, skill: pipelines/anime-hybrid/executive-producer, required_artifacts_in: [content_architecture, proposal_packet], produces: [script], tools_available: [], checkpoint_required: true, human_approval_default: true}
-  - {name: visual_development, skill: pipelines/anime-hybrid/executive-producer, required_artifacts_in: [script], produces: [visual_development], tools_available: [image_selector], checkpoint_required: true, human_approval_default: false}
-  - {name: scene_plan, skill: pipelines/anime-hybrid/scene-director, required_artifacts_in: [script, visual_development], produces: [scene_plan], tools_available: [image_selector], checkpoint_required: true, human_approval_default: true}
-  - {name: assets, skill: pipelines/anime-hybrid/asset-director, required_artifacts_in: [scene_plan, visual_development], produces: [asset_manifest], tools_available: [image_selector, video_selector, video_compose], checkpoint_required: true, human_approval_default: false, review_focus: ["Cuts that fail the visual-constraint gate stay in planning", "video_selector and video_compose must not run without approved stills"], success_criteria: [Only production-ready cuts leave planning]}
+  - {name: visual_development, skill: pipelines/anime-hybrid/executive-producer, required_artifacts_in: [script], produces: [visual_development], tools_available: [image_selector, agnes_vision], checkpoint_required: true, human_approval_default: false}
+  - {name: scene_plan, skill: pipelines/anime-hybrid/scene-director, required_artifacts_in: [script, visual_development], produces: [scene_plan], tools_available: [image_selector, agnes_vision], checkpoint_required: true, human_approval_default: true}
+  - {name: assets, skill: pipelines/anime-hybrid/asset-director, required_artifacts_in: [scene_plan, visual_development], produces: [asset_manifest], tools_available: [image_selector, video_selector, video_compose, agnes_vision], checkpoint_required: true, human_approval_default: false, review_focus: ["Cuts that fail the visual-constraint gate stay in planning", "video_selector and video_compose must not run without approved stills"], success_criteria: [Only production-ready cuts leave planning]}
   - {name: edit, skill: pipelines/anime-hybrid/asset-director, required_artifacts_in: [scene_plan, asset_manifest], produces: [edit_decisions], tools_available: [subtitle_gen, audio_mixer, video_compose], checkpoint_required: true, human_approval_default: false}
   - {name: compose, skill: pipelines/anime-hybrid/asset-director, required_artifacts_in: [edit_decisions, asset_manifest], produces: [render_report], tools_available: [video_compose, audio_mixer, video_stitch], checkpoint_required: true, human_approval_default: false}
   - name: temporal_analysis
@@ -63,7 +63,7 @@ stages:
     skill: pipelines/anime-hybrid/quality-director
     required_artifacts_in: [render_report, temporal_motion_report, limited_grammar_report]
     produces: [creative_intent_contract, frame_packet, editorial_critique]
-    tools_available: [video_analyzer]
+    tools_available: [video_analyzer, agnes_vision]
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -108,6 +108,6 @@ stages:
       - Output hash differs from the draft compose hash
       - Machine gates re-run on the new hash
     success_criteria: [after_sha256 differs from before_sha256]
-  - {name: independent_qa, skill: pipelines/anime-hybrid/quality-director, required_artifacts_in: [render_report, scene_plan, editorial_critique], produces: [final_review], tools_available: [video_analyzer], checkpoint_required: true, human_approval_default: false}
+  - {name: independent_qa, skill: pipelines/anime-hybrid/quality-director, required_artifacts_in: [render_report, scene_plan, editorial_critique], produces: [final_review], tools_available: [video_analyzer, agnes_vision], checkpoint_required: true, human_approval_default: false}
   - {name: final_gate, skill: pipelines/anime-hybrid/quality-director, required_artifacts_in: [final_review, render_report], produces: [final_gate], tools_available: [], checkpoint_required: true, human_approval_default: true}
   - {name: publish_package, skill: pipelines/anime-hybrid/quality-director, required_artifacts_in: [final_gate, render_report], produces: [publish_log], tools_available: [export_bundle], checkpoint_required: true, human_approval_default: false}

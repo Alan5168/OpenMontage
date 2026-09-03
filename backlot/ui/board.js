@@ -815,7 +815,8 @@ function renderStoryboard(s) {
 
 function renderSevenColumnStoryboard(s) {
   const board = s.storyboard;
-  if (!board || board.presentation_contract !== "seven-column-v1") return null;
+  const contract = board && board.presentation_contract;
+  if (contract !== "seven-column-v1" && contract !== "eight-column-v1") return null;
   const rows = board.scenes.map((card) => {
     let visual;
     const ref = card.layout_visual;
@@ -856,8 +857,11 @@ function renderSevenColumnStoryboard(s) {
       el("td", { class: "col-cut" }, card.id),
       el("td", { class: "col-visual" }, visual),
       el("td", { class: "col-content" },
+        card.visual_intent ? el("div", { class: "visual-intent" }, card.visual_intent) : null,
         el("div", { class: "layout-notes" }, card.layout_notes || card.description || ""),
-        card.t2i_prompt ? el("details", {}, el("summary", {}, "layout prompt"), el("code", {}, card.t2i_prompt)) : null,
+        card.t2i_prompt ? el("details", {}, el("summary", {}, "layout prompt (t2i)"), el("code", {}, card.t2i_prompt)) : null,
+        card.i2v_prompt ? el("details", {}, el("summary", {}, "motion prompt (i2v / H3)"), el("code", {}, card.i2v_prompt)) : null,
+        (card.avoid && card.avoid.length) ? el("div", { class: "avoid" }, `avoid: ${card.avoid.join("; ")}`) : null,
         el("span", { class: "route" }, [
           card.department === "planning" ? "PLANNING" : (card.animation_class || card.department),
           card.motion_route,
@@ -908,8 +912,9 @@ function renderSevenColumnStoryboard(s) {
     },
   }, "Export cut decisions");
   return el("div", { class: "seven-col-wrap" },
-    el("div", { class: "section-title" }, "Seven-column scene plan",
-      el("span", { class: "meta" }, `${board.scenes.length} cuts · scene_plan.scenes[].id is SSOT`),
+    el("div", { class: "section-title" },
+      contract === "eight-column-v1" ? "Eight-column scene plan" : "Seven-column scene plan",
+      el("span", { class: "meta" }, `${board.scenes.length} cuts · scene_plan.scenes[].id is SSOT · intent / prompt / result stay independent`),
       exportButton),
     table);
 }

@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/shot_render_package",
+  "title": "SHOT_RENDER_PACKAGE_v1",
+  "description": "Provider-neutral shot envelope. Creative intent lives here; local H3 / RunningHub / others only compile. A new output hash is not a useful revision. RunningHub SUCCESS is not OM PASS.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "project_id",
+    "scene_id",
+    "shot_id",
+    "creative",
+    "frames",
+    "performance",
+    "render_policy",
+    "acceptance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string", "const": "shot_render_package_v1" },
+    "project_id": { "type": "string", "minLength": 1 },
+    "scene_id": { "type": "string", "minLength": 1 },
+    "shot_id": { "type": "string", "minLength": 1 },
+    "package_sha256": { "type": ["string", "null"] },
+    "creative": {
+      "type": "object",
+      "required": ["shot_intent", "duration_s", "aspect_ratio"],
+      "additionalProperties": false,
+      "properties": {
+        "shot_intent": { "type": "string", "minLength": 1 },
+        "audience_state_before": { "type": "string" },
+        "audience_state_after": { "type": "string" },
+        "shot_size": { "type": "string" },
+        "duration_s": { "type": "number", "minimum": 0.1 },
+        "aspect_ratio": { "type": "string", "minLength": 1 },
+        "camera": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string" },
+            "movement": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "anchors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "characters": { "type": "array", "items": { "$ref": "#/$defs/asset_ref" } },
+        "scene": { "anyOf": [{ "$ref": "#/$defs/asset_ref" }, { "type": "null" }] },
+        "props": { "type": "array", "items": { "$ref": "#/$defs/asset_ref" } },
+        "composition": { "anyOf": [{ "$ref": "#/$defs/asset_ref" }, { "type": "null" }] }
+      }
+    },
+    "frames": {
+      "type": "object",
+      "required": ["first_frame"],
+      "additionalProperties": false,
+      "properties": {
+        "first_frame": { "$ref": "#/$defs/frame_ref" },
+        "last_frame": { "anyOf": [{ "$ref": "#/$defs/frame_ref" }, { "type": "null" }] }
+      }
+    },
+    "performance": {
+      "type": "object",
+      "required": ["motion_obligation"],
+      "additionalProperties": false,
+      "properties": {
+        "motion_obligation": {
+          "type": "string",
+          "enum": ["NONE", "LOCAL", "PERFORMANCE", "INTERACTION"]
+        },
+        "temporal_beats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["t", "action"],
+            "additionalProperties": false,
+            "properties": {
+              "t": { "type": "string" },
+              "actor": { "type": "string" },
+              "action": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dialogue": { "type": "array", "items": { "type": "string" } },
+        "sfx": { "type": "array", "items": { "type": "string" } },
+        "music_intent": { "type": ["string", "null"] }
+      }
+    },
+    "render_policy": {
+      "type": "object",
+      "required": ["stage", "preferred_target"],
+      "additionalProperties": false,
+      "properties": {
+        "stage": { "type": "string", "enum": ["PREVIS", "DRAFT", "FINAL", "HERO"] },
+        "preferred_target": {
+          "type": "string",
+          "enum": ["local_h3", "local_deterministic", "runninghub", "xiaoyunque", "libtv"]
+        },
+        "fallback_targets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["local_h3", "local_deterministic", "runninghub", "xiaoyunque", "libtv"]
+          }
+        },
+        "target_resolution": { "type": "string" },
+        "profile": { "type": "string" }
+      }
+    },
+    "provider_prompt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "neutral_prompt": { "type": "string" },
+        "negative_constraints": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "identity": { "type": ["boolean", "string"] },
+        "composition": { "type": ["boolean", "string"] },
+        "motion": { "type": "string" },
+        "continuity": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "asset_ref": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string" },
+        "asset_ref": { "type": ["string", "null"] },
+        "sha256": { "type": ["string", "null"] }
+      }
+    },
+    "frame_ref": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "SHOT_KEYFRAME",
+            "DIRECTED_MCU_COPY",
+            "IDENTITY_REFERENCE",
+            "SCENE_REFERENCE",
+            "COMPOSITION_REFERENCE",
+            "MISSING"
+          ]
+        },
+        "asset_ref": { "type": ["string", "null"] },
+        "sha256": { "type": ["string", "null"] },
+        "width": { "type": ["integer", "null"] },
+        "height": { "type": ["integer", "null"] }
+      }
+    }
+  }
+}

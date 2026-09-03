@@ -39,7 +39,103 @@
           },
           "t2i_prompt": {
             "type": "string",
-            "description": "Exact prompt used only for the scene-plan layout reference"
+            "description": "Exact prompt used only for the scene-plan layout reference / still. Independent of visual_intent."
+          },
+          "i2v_prompt": {
+            "type": "string",
+            "description": "Exact provider prompt for motion (H3/I2V). Independent of visual_intent and of t2i_prompt. Required by eight-column presentation when motion_route is H3."
+          },
+          "avoid": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Retention / negative constraints compiled into t2i_prompt and i2v_prompt"
+          },
+          "anchor_refs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "description": "STYLE/CHARACTER/SCENE/PROP/COMPOSITION/SOUND ids this cut binds. Not LibTV node_key."
+          },
+          "audience_state_change": {
+            "type": "string",
+            "description": "What the audience now knows or feels after this cut. Not the picture description."
+          },
+          "audience_state_before": {
+            "type": "string",
+            "description": "Audience knowledge/feeling entering this cut. Must differ from audience_state_change."
+          },
+          "anchor_bindings": {
+            "type": "array",
+            "description": "anchor_refs resolved to path+sha256, or status=unresolved. Not LibTV node_key.",
+            "items": {
+              "type": "object",
+              "required": ["id", "kind", "status"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "kind": { "type": "string" },
+                "status": { "type": "string", "enum": ["bound", "unresolved"] },
+                "path": { "type": ["string", "null"] },
+                "sha256": { "type": ["string", "null"] },
+                "aspect_note": { "type": ["string", "null"] },
+                "role": {
+                  "type": "string",
+                  "description": "IDENTITY_REFERENCE / SCENE_REFERENCE / PROP_REFERENCE / COMPOSITION_REFERENCE / STYLE_REFERENCE / SOUND_REFERENCE. Not a shot keyframe."
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "shot_profile": {
+            "type": "object",
+            "description": "Director class for this cut. Temporal beats must match this class.",
+            "properties": {
+              "framing_class": { "type": "string" },
+              "action_type": { "type": "string" },
+              "visible_subject": { "type": "string" }
+            },
+            "additionalProperties": false
+          },
+          "first_frame_readiness": {
+            "type": "object",
+            "description": "local_image is not shot_ready. H3 FL2VA requires a 9:16 SHOT_KEYFRAME.",
+            "properties": {
+              "role": { "type": "string" },
+              "shot_ready": { "type": "boolean" },
+              "path": { "type": ["string", "null"] },
+              "composition_id": { "type": ["string", "null"] },
+              "aspect": { "type": ["string", "null"] },
+              "blockers": { "type": "array", "items": { "type": "string" } },
+              "h3_dispatch_allowed": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          },
+          "local_motion_fn": {
+            "type": "string",
+            "description": "Deterministic local motion function when motion_obligation is LOCAL. Not ffmpeg-hold."
+          },
+          "h3_ir": {
+            "type": "object",
+            "description": "Structured H3 cut spec consumed by lib.h3_context_ir.compile_from_scene. Not a dispatch, not PASS."
+          },
+          "temporal_beats": {
+            "type": "array",
+            "description": "Declared time grammar inside this cut. One camera setup; split the row if you need another.",
+            "items": {
+              "type": "object",
+              "required": ["kind", "t_start", "t_end"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["HOLD", "CAMERA", "AMBIENT", "CHARACTER_PERFORMANCE", "GRAPHIC", "PROP"]
+                },
+                "t_start": { "type": "number", "minimum": 0 },
+                "t_end": { "type": "number", "minimum": 0 },
+                "action": {
+                  "type": "string",
+                  "description": "What happens in this beat. Required for PERFORMANCE/LOCAL; empty HOLD is allowed."
+                }
+              },
+              "additionalProperties": false
+            }
           },
           "dialogue": {
             "type": "string",
@@ -53,7 +149,44 @@
           "animation_class": {
             "type": "string",
             "enum": ["LIMITED", "I2V_STANDARD", "I2V_HARD"],
-            "description": "Planned motion class. Optional. Missing class drafts as LIMITED after the minimum visual contract. I2V_HARD must be explicit. Dispatch is illegal until lib/shot_production_gate reports production_ready."
+            "description": "Planned motion class. Optional. Missing class drafts from motion_obligation: NONE/LOCAL → LIMITED, PERFORMANCE/INTERACTION → I2V_HARD. LIMITED plus PERFORMANCE is a compile failure. Dispatch is illegal until lib/shot_production_gate reports production_ready."
+          },
+          "motion_obligation": {
+            "type": "string",
+            "enum": ["NONE", "LOCAL", "PERFORMANCE", "INTERACTION"],
+            "description": "Declared time grammar. PERFORMANCE/INTERACTION default to H3. Cannot be satisfied by local_compose, ffmpeg loop, or still+zoom."
+          },
+          "performance_intent": {
+            "type": "string",
+            "description": "What the character does in time. If this names locomotion or acting, motion_obligation is PERFORMANCE unless explicitly NONE with intentional_hold."
+          },
+          "intentional_hold": {
+            "type": "boolean",
+            "description": "Required when motion_obligation is NONE on a character cut. Silent still-loop without this flag is illegal for PERFORMANCE."
+          },
+          "renderer": {
+            "type": "string",
+            "description": "Intended renderer family. local_compose/ffmpeg/remotion are illegal on PERFORMANCE/INTERACTION."
+          },
+          "render": {
+            "type": "object",
+            "description": "Factory routing hint for SHOT_RENDER_PACKAGE. Does not authorize dispatch_cut. Cursor still must not impersonate Prime.",
+            "additionalProperties": false,
+            "properties": {
+              "target": {
+                "type": "string",
+                "enum": ["local_h3", "local_deterministic", "runninghub", "xiaoyunque", "libtv"]
+              },
+              "stage": {
+                "type": "string",
+                "enum": ["PREVIS", "DRAFT", "FINAL", "HERO"]
+              },
+              "profile": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Provider profile id, e.g. rh_h3_fl2va_final_v1. Not API parameters."
+              }
+            }
           },
           "character_ids": {
             "type": "array",
@@ -63,6 +196,27 @@
           "costume_ids": {
             "type": "array",
             "items": { "type": "string", "minLength": 1 }
+          },
+          "character_variant": {
+            "type": "object",
+            "description": "Phase × costume × view slot for this cut. still_refs are IDENTITY_REFERENCE, never SHOT_KEYFRAME / H3 Picture 1. Wardrobe lives here, not in visual_continuity_package.world_lock.",
+            "required": ["character_id"],
+            "additionalProperties": false,
+            "properties": {
+              "character_id": { "type": "string", "minLength": 1 },
+              "phase": { "type": "string", "minLength": 1 },
+              "costume": { "type": "string", "minLength": 1 },
+              "view": {
+                "type": "string",
+                "enum": ["front_3q", "full_body", "front_face", "profile_left", "profile_right"]
+              },
+              "must_show": { "type": "string" },
+              "still_refs": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "description": "Identity/costume stills. Illegal as start_frame_ref for H3."
+              }
+            }
           },
           "start_frame_ref": {
             "type": "string",
@@ -260,7 +414,7 @@
         },
         "world_lock": {
           "type": "object",
-          "description": "Shared palette/material/hero props across mother frames",
+          "description": "Shared palette/material/hero props across mother frames. Character wardrobe, hair, and face belong on scenes[].character_variant, not here.",
           "minProperties": 1
         },
         "hero_prop_id": { "type": "string", "minLength": 1 },

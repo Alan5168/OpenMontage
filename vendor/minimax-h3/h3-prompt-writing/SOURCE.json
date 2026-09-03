@@ -1,0 +1,19 @@
+{
+  "source_repo": "MiniMax-AI/MiniMax-H3",
+  "source_path": "skills/h3-prompt-writing",
+  "retrieved_utc": "2026-08-24T09:27:36Z",
+  "files": {
+    "SKILL.md": {
+      "url": "https://raw.githubusercontent.com/MiniMax-AI/MiniMax-H3/main/skills/h3-prompt-writing/SKILL.md",
+      "bytes": 2623
+    },
+    "references/base-en.txt": {
+      "url": "https://raw.githubusercontent.com/MiniMax-AI/MiniMax-H3/main/skills/h3-prompt-writing/references/base-en.txt",
+      "bytes": 15773
+    },
+    "references/ref-en.txt": {
+      "url": "https://raw.githubusercontent.com/MiniMax-AI/MiniMax-H3/main/skills/h3-prompt-writing/references/ref-en.txt",
+      "bytes": 23553
+    }
+  }
+}

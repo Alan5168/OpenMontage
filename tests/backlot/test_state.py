@@ -338,6 +338,21 @@ class TestStoryboardVisualSelection:
         assert card["visual"] is not None
         assert card["visual"]["exists"] is False
 
+    def test_renderable_prefers_existing_and_takes_exclude_missing(self, projects_root):
+        p = self._project_with_scenes(
+            projects_root,
+            [{"id": "sc1", "type": "generated", "start_seconds": 0, "end_seconds": 5}],
+            [
+                {"id": "a1", "type": "image", "path": "assets/images/real.png", "scene_id": "sc1", "source_tool": "t"},
+                {"id": "a2", "type": "image", "path": "assets/images/missing.png", "scene_id": "sc1", "source_tool": "t"},
+            ],
+        )
+        (p / "assets" / "images" / "real.png").write_bytes(b"\x89PNG")
+        card = self._card(p, "sc1")
+        assert card["visual"]["exists"] is True
+        assert card["visual"]["path"].endswith("real.png")
+        assert [t["path"].split("/")[-1] for t in card["takes"]] == ["real.png"]
+
 
 def test_seven_column_fields_surface_without_replacing_final_asset(projects_root):
     p = _make_project(projects_root, "seven")
@@ -365,19 +380,33 @@ def test_seven_column_fields_surface_without_replacing_final_asset(projects_root
     assert card["review_decision"] == "keep"
     assert card["visual"] is None
 
-    def test_renderable_prefers_existing_and_takes_exclude_missing(self, projects_root):
-        # Two takes: one real png, one missing. Active = the real one;
-        # takes carries only renderable (showable) entries.
-        p = self._project_with_scenes(
-            projects_root,
-            [{"id": "sc1", "type": "generated", "start_seconds": 0, "end_seconds": 5}],
-            [
-                {"id": "a1", "type": "image", "path": "assets/images/real.png", "scene_id": "sc1", "source_tool": "t"},
-                {"id": "a2", "type": "image", "path": "assets/images/missing.png", "scene_id": "sc1", "source_tool": "t"},
-            ],
-        )
-        (p / "assets" / "images" / "real.png").write_bytes(b"\x89PNG")
-        card = self._card(p, "sc1")
-        assert card["visual"]["exists"] is True
-        assert card["visual"]["path"].endswith("real.png")
-        assert [t["path"].split("/")[-1] for t in card["takes"]] == ["real.png"]
+
+def test_eight_column_fields_surface_intent_and_motion_prompt(projects_root):
+    p = _make_project(projects_root, "eight")
+    plan = {
+        "version": "1.0",
+        "scenes": [{
+            "id": "c001", "type": "character_scene", "description": "MCU Avery",
+            "script_section_id": "s1", "start_seconds": 0, "end_seconds": 5,
+            "layout_notes": "MCU cooler; locked-off.",
+            "visual_intent": "Avery cannot move at the cooler.",
+            "t2i_prompt": "textless limited TV anime still, MCU Avery at cooler",
+            "i2v_prompt": "integrated_multimodal_description: MCU Avery, mouth closed.",
+            "avoid": ["smile"],
+            "dialogue": "", "voice_segment_ids": ["silence-c001"],
+            "visual_ref": {"kind": "placeholder", "placeholder_reason": "draft"},
+            "sound_intent": {"se": ["compressor hum"], "bgm_mood": "none"},
+            "motion_route": "H3", "review_decision": "pending",
+        }],
+        "metadata": {"presentation_contract": "eight-column-v1"},
+    }
+    _write(p / "artifacts" / "scene_plan.json", plan)
+    state = load_board_state(p)
+    board = state["storyboard"]
+    card = board["scenes"][0]
+    assert board["presentation_contract"] == "eight-column-v1"
+    assert card["visual_intent"] == "Avery cannot move at the cooler."
+    assert card["t2i_prompt"] == "textless limited TV anime still, MCU Avery at cooler"
+    assert card["i2v_prompt"].startswith("integrated_multimodal_description")
+    assert card["avoid"] == ["smile"]
+    assert card["sound_intent"]["se"] == ["compressor hum"]

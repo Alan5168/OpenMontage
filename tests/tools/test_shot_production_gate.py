@@ -172,6 +172,15 @@ def test_missing_class_drafts_as_limited_after_identity_lock(tmp_path: Path):
     assert row["h3_allowed"] is False
 
 
+def test_motion_dispatch_rejects_performance_on_local_compose(tmp_path: Path):
+    plan = _ready_plan(tmp_path, "LIMITED")
+    plan["scenes"][0]["performance_intent"] = "Avery walks toward cooler"
+    plan["scenes"][0]["renderer"] = "local_compose"
+    err = motion_dispatch_error({"scene_plan": plan, "cut_id": "c001", "project_dir": str(tmp_path)})
+    assert err
+    assert "PERFORMANCE cannot be satisfied" in err
+
+
 def test_overlay_l0_blocks_motion_after_identity_lock(tmp_path: Path):
     plan = _ready_plan(tmp_path, "I2V_STANDARD")
     error = motion_dispatch_error(

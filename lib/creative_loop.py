@@ -71,6 +71,45 @@ def _has_black_frame(path: Path) -> bool:
     return "black_start" in (result.stderr or "")
 
 
+def _extract_one_frame(
+    ffmpeg: str,
+    mp4: Path,
+    out_dir: Path,
+    *,
+    index: int,
+    stamp: float | None,
+    kind: str,
+    sseof: bool = False,
+) -> dict[str, Any] | None:
+    if sseof:
+        label = "sseof"
+        dest = out_dir / f"f{index:02d}_t{label}.png"
+        cmd = [
+            ffmpeg, "-y", "-sseof", "-0.08", "-i", str(mp4),
+            "-frames:v", "1", "-q:v", "2", str(dest),
+        ]
+    else:
+        assert stamp is not None
+        dest = out_dir / f"f{index:02d}_t{stamp:.3f}.png"
+        cmd = [
+            ffmpeg, "-y", "-ss", f"{stamp:.3f}", "-i", str(mp4),
+            "-frames:v", "1", "-q:v", "2", str(dest),
+        ]
+    subprocess.run(cmd, check=False, capture_output=True)
+    if not dest.is_file() or dest.stat().st_size < 32:
+        if dest.is_file():
+            dest.unlink()
+        return None
+    t_value = float(stamp) if stamp is not None else probe_mp4(mp4)["duration_seconds"] - 0.08
+    return {
+        "id": f"f{index:02d}",
+        "t": round(max(0.0, t_value), 3),
+        "path": str(dest),
+        "sha256": sha256_file(dest),
+        "kind": kind,
+    }
+
+
 def extract_frames(
     mp4: Path,
     out_dir: Path,
@@ -90,31 +129,57 @@ def extract_frames(
     while t < duration:
         times.append(round(t, 3))
         t += interval
-    for anchor in anchors or []:
-        if 0 <= anchor <= duration:
-            times.append(round(float(anchor), 3))
+    last = round(max(0.0, duration - (1.0 / 24.0)), 3)
+    if last > 0:
+        times.append(last)
+    if duration > 0 and len(set(times)) < 3:
+        times.append(round(duration * 0.5, 3))
     times = sorted(set(times))
+    for anchor in anchors or []:
+        if 0 <= float(anchor) <= max(0.0, duration - 0.05):
+            times.append(round(float(anchor), 3))
+    last = round(max(0.0, duration - 0.08), 3)
+    times = sorted({t for t in times if 0.0 <= t <= last})
+    if duration > 0:
+        mid = round(duration * 0.5, 3)
+        if mid not in times and 0.0 < mid <= last:
+            times.append(mid)
+            times = sorted(set(times))
     out_dir.mkdir(parents=True, exist_ok=True)
     frames: list[dict[str, Any]] = []
     for index, stamp in enumerate(times):
         kind = "t0" if stamp == 0 else ("anchor" if anchors and stamp in anchors else "interval")
-        frame_id = f"f{index:02d}"
-        dest = out_dir / f"{frame_id}_t{stamp:.3f}.png"
-        cmd = [
-            ffmpeg, "-y", "-i", str(mp4),
-            "-ss", f"{stamp:.3f}",
-            "-frames:v", "1", "-q:v", "2", str(dest),
-        ]
-        subprocess.run(cmd, check=True, capture_output=True)
-        if not dest.is_file() or dest.stat().st_size < 32:
-            raise CreativeLoopError(f"frame extract produced empty file at t={stamp}")
-        frames.append({
-            "id": frame_id,
-            "t": stamp,
-            "path": str(dest),
-            "sha256": sha256_file(dest),
-            "kind": kind,
-        })
+        grabbed = _extract_one_frame(ffmpeg, mp4, out_dir, index=index, stamp=stamp, kind=kind)
+        if grabbed is None:
+            if stamp <= 0.0:
+                raise CreativeLoopError(f"frame extract produced empty file at t={stamp}")
+            continue
+        frames.append(grabbed)
+    if len(frames) < 3 and duration > 0:
+        for stamp, kind in (
+            (round(max(0.0, duration - 0.15), 3), "interval"),
+            (round(duration * 0.5, 3), "interval"),
+        ):
+            if any(abs(row["t"] - stamp) < 0.02 for row in frames):
+                continue
+            grabbed = _extract_one_frame(
+                ffmpeg, mp4, out_dir, index=len(frames), stamp=stamp, kind=kind
+            )
+            if grabbed is not None:
+                frames.append(grabbed)
+            if len(frames) >= 3:
+                break
+    if len(frames) < 3:
+        grabbed = _extract_one_frame(
+            ffmpeg, mp4, out_dir, index=len(frames), stamp=None, kind="interval", sseof=True
+        )
+        if grabbed is not None:
+            frames.append(grabbed)
+    if len(frames) < 3:
+        raise CreativeLoopError("frame extract produced no readable stills")
+    frames.sort(key=lambda row: float(row["t"]))
+    for index, row in enumerate(frames):
+        row["id"] = f"f{index:02d}"
     packet = {
         "version": "frame-packet/v0.1",
         "source_mp4": str(mp4),

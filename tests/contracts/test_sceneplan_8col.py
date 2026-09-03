@@ -32,3 +32,25 @@ def test_prompt_change_does_not_overwrite_visual_intent() -> None:
     plan["scenes"][0]["t2i_prompt"] = "a corrected exact provider prompt"
     validate_eight_column_scene_plan(plan)
     assert plan["scenes"][0]["visual_intent"] == intent
+
+
+def test_h3_cut_requires_i2v_prompt() -> None:
+    plan = valid_plan()
+    plan["scenes"][0]["motion_route"] = "H3"
+    with pytest.raises(EightColumnValidationError, match="i2v_prompt"):
+        validate_eight_column_scene_plan(plan)
+
+
+def test_h3_cut_requires_i2v_prompt_separate_from_intent() -> None:
+    plan = valid_plan()
+    plan["scenes"][0]["motion_route"] = "H3"
+    plan["scenes"][0]["i2v_prompt"] = plan["scenes"][0]["visual_intent"]
+    with pytest.raises(EightColumnValidationError, match="i2v_prompt"):
+        validate_eight_column_scene_plan(plan)
+
+
+def test_h3_cut_accepts_separate_i2v_prompt() -> None:
+    plan = valid_plan()
+    plan["scenes"][0]["motion_route"] = "H3"
+    plan["scenes"][0]["i2v_prompt"] = "integrated_multimodal_description: layout-locked MCU, mouth closed."
+    validate_eight_column_scene_plan(plan)

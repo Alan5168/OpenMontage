@@ -75,6 +75,13 @@ def _validate_scene_plan(
         elif visual.get("kind") == "placeholder" and not visual.get("placeholder_reason"):
             raise EightColumnValidationError(f"{sid}: placeholder_reason required")
 
+        if scene.get("motion_route") == "H3":
+            _required_text(scene, "i2v_prompt")
+            intent = (scene.get("visual_intent") or "").strip()
+            if intent and intent == (scene.get("i2v_prompt") or "").strip():
+                raise EightColumnValidationError(
+                    f"{sid}: i2v_prompt must not be a copy of visual_intent"
+                )
         if require_review_decisions:
             decision = scene.get("review_decision")
             if decision not in {"keep", "change", "merge", "omit"}:
@@ -89,7 +96,12 @@ def validate_eight_column_scene_plan(
     *,
     require_review_decisions: bool = False,
 ) -> None:
-    """Require separate visual intent and exact prompt fields for every cut."""
+    """Require separate visual intent and exact prompt fields for every cut.
+
+    Hosoda-style table columns stay the same: S / C / 画面 / 内容·摄影·Prompt /
+    台词 / 秒数 / 音响. Eight-column adds intent vs exact prompt vs result as
+    independent cells inside that table — not a second ledger.
+    """
     _validate_scene_plan(
         plan,
         require_review_decisions=require_review_decisions,

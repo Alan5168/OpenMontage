@@ -21,6 +21,58 @@ class ComfyUIError(Exception):
     """Raised when ComfyUI returns an error or times out."""
 
 
+def compact_execution_error(messages: Any, *, limit: int = 1500) -> str:
+    """Keep receipts readable. Do not dump latent tensors from execution_error."""
+    if isinstance(messages, list):
+        for item in messages:
+            if not (isinstance(item, (list, tuple)) and len(item) >= 2):
+                continue
+            kind, payload = item[0], item[1]
+            if kind == "execution_error" and isinstance(payload, dict):
+                node = payload.get("node_type") or payload.get("node_id")
+                exc = payload.get("exception_type") or "Error"
+                msg = str(payload.get("exception_message") or "").strip().splitlines()
+                first = msg[0] if msg else ""
+                text = f"{node}: {exc}: {first}"
+                return text[:limit]
+    text = json.dumps(messages, default=str) if not isinstance(messages, str) else messages
+    return text[:limit]
+
+
+def _timestamp_seconds(value: Any) -> float | None:
+    if not isinstance(value, (int, float)):
+        return None
+    ts = float(value)
+    if ts > 1e11:
+        return ts / 1000.0
+    return ts
+
+
+def history_execution_seconds(entry: dict[str, Any]) -> float | None:
+    """Comfy history execution_start → execution_success, if present."""
+    messages = (entry.get("status") or {}).get("messages") or []
+    start_ts = None
+    end_ts = None
+    if not isinstance(messages, list):
+        return None
+    for item in messages:
+        if not (isinstance(item, (list, tuple)) and len(item) >= 2):
+            continue
+        kind, payload = item[0], item[1]
+        if not isinstance(payload, dict):
+            continue
+        if kind == "execution_start":
+            start_ts = _timestamp_seconds(payload.get("timestamp"))
+        elif kind in {"execution_success", "execution_interrupted", "execution_error"}:
+            end_ts = _timestamp_seconds(payload.get("timestamp"))
+    if start_ts is None or end_ts is None:
+        return None
+    delta = end_ts - start_ts
+    if delta < 0:
+        return None
+    return round(delta, 3)
+
+
 class ComfyUIClient:
     """Client for the ComfyUI REST API.
 
@@ -36,6 +88,7 @@ class ComfyUIClient:
             server_url
             or os.environ.get("COMFYUI_SERVER_URL", "http://localhost:8188")
         ).rstrip("/")
+        self.last_timing: dict[str, Any] | None = None
 
     # ------------------------------------------------------------------
     # Health
@@ -174,7 +227,7 @@ class ComfyUIClient:
                 status = entry.get("status", {})
                 if status.get("status_str") == "error":
                     msgs = status.get("messages", [])
-                    raise ComfyUIError(f"Execution error: {msgs}")
+                    raise ComfyUIError(f"Execution error: {compact_execution_error(msgs)}")
                 return entry
             time.sleep(interval)
         raise ComfyUIError(
@@ -230,9 +283,17 @@ class ComfyUIClient:
         timeout: int = 600,
         interval: int = 5,
     ) -> list[Path]:
-        """Submit → poll → download.  Returns list of artifact paths."""
+        """Submit → poll → download.  Returns list of artifact paths.
+
+        Also writes ``self.last_timing`` so callers can split queue/exec/download
+        instead of treating wall_time as GPU time.
+        """
+        self.last_timing = None
+        t0 = time.perf_counter()
         prompt_id = self.submit(workflow)
+        t_submitted = time.perf_counter()
         entry = self.poll(prompt_id, timeout=timeout, interval=interval)
+        t_polled = time.perf_counter()
 
         outputs = entry.get("outputs", {})
         node_output = outputs.get(output_node, {})
@@ -259,6 +320,18 @@ class ComfyUIClient:
                 item.get("type", "output"),
             )
             paths.append(target)
+        t_downloaded = time.perf_counter()
+        exec_s = history_execution_seconds(entry)
+        poll_s = round(t_polled - t_submitted, 3)
+        self.last_timing = {
+            "prompt_id": prompt_id,
+            "submit_s": round(t_submitted - t0, 3),
+            "client_queue_and_poll_s": poll_s,
+            "comfy_prompt_exec_s": exec_s,
+            "download_s": round(t_downloaded - t_polled, 3),
+            "poll_interval_s": interval,
+            "timing_source": "history_messages" if exec_s is not None else "poll_wall",
+        }
         return paths
 
     # ------------------------------------------------------------------

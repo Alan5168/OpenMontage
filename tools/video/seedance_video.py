@@ -179,6 +179,32 @@ class SeedanceVideo(BaseTool):
         return 60.0 if variant == "fast" else 120.0
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        if inputs.get("quote_only"):
+            from lib.metered_provider import quote_metered_tool
+
+            quote = quote_metered_tool(self, inputs)
+            return ToolResult(success=True, data=quote, cost_usd=0.0, duration_seconds=0.0)
+
+        if isinstance(inputs.get("shot"), dict):
+            from lib.seedance_ref_packer import SeedanceRefPackError, pack_seedance_refs
+
+            try:
+                packed = pack_seedance_refs(
+                    inputs["shot"], project_dir=inputs.get("project_dir")
+                )
+            except SeedanceRefPackError as exc:
+                return ToolResult(success=False, error=str(exc))
+            merged = dict(inputs)
+            if packed["operation"] == "reference_to_video" and not (
+                merged.get("reference_image_paths") or merged.get("reference_image_urls")
+            ):
+                merged["operation"] = "reference_to_video"
+                merged["reference_image_paths"] = packed["reference_image_paths"]
+            elif packed["operation"] == "image_to_video" and packed.get("image_path"):
+                merged.setdefault("operation", "image_to_video")
+                merged.setdefault("image_path", packed["image_path"])
+            inputs = merged
+
         api_key = self._get_api_key()
         if not api_key:
             return ToolResult(

@@ -29,6 +29,20 @@
     "placeholder_composite_present": { "type": "boolean" },
     "unplanned_audio_silence_seconds": { "type": "number" },
     "first_sound_seconds": { "type": ["number", "null"] },
+    "temporal_intent_realization": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["cut_id", "declared", "observed", "result"],
+        "additionalProperties": false,
+        "properties": {
+          "cut_id": { "type": "string" },
+          "declared": { "type": "string" },
+          "observed": { "type": "array", "items": { "type": "string" } },
+          "result": { "type": "string", "enum": ["PASS", "FAIL"] }
+        }
+      }
+    },
     "judgment": { "type": "string", "const": "eligibility_only" },
     "note": { "type": "string" }
   }

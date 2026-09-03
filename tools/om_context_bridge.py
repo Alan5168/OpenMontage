@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.error import URLError
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 # OpenViking context 根目录（content-studio workspace）
 CONTEXT_ROOT = Path(
@@ -104,7 +104,10 @@ def _to_viking_uri(path: Path) -> str:
 def _http_ok(url: str, timeout: int = 3) -> tuple[bool, str]:
     try:
         req = Request(url, headers={"Accept": "application/json, text/plain"})
-        with urlopen(req, timeout=timeout) as resp:
+        # The Windows studio may export a SOCKS proxy for browser traffic.
+        # OpenViking and Qdrant are loopback services and must never inherit it.
+        opener = build_opener(ProxyHandler({}))
+        with opener.open(req, timeout=timeout) as resp:
             body = resp.read().decode("utf-8", errors="ignore")[:500]
             return 200 <= resp.status < 300, body.strip()
     except Exception as e:
@@ -115,6 +118,18 @@ def _ov_cli(args: list[str], timeout: int = 60) -> tuple[int, str, str]:
     if not OV_BIN.is_file():
         raise ContextBridgeError(f"OpenViking CLI 不存在: {OV_BIN}")
     cmd = [str(OV_BIN), "-o", "json", "--account", OV_ACCOUNT, *args]
+    env = os.environ.copy()
+    for name in (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+    ):
+        env.pop(name, None)
+    env["NO_PROXY"] = "127.0.0.1,localhost,::1"
+    env["no_proxy"] = env["NO_PROXY"]
     proc = subprocess.run(
         cmd,
         capture_output=True,
@@ -122,6 +137,7 @@ def _ov_cli(args: list[str], timeout: int = 60) -> tuple[int, str, str]:
         timeout=timeout,
         encoding="utf-8",
         errors="replace",
+        env=env,
     )
     return proc.returncode, proc.stdout or "", proc.stderr or ""
 

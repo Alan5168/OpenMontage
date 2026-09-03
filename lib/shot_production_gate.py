@@ -12,6 +12,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from lib.character_variant import cut_variant_blockers
+
 PLANNING = "planning"
 UNCLASSIFIED = "unclassified"
 DEFAULT_DISPATCH_CLASS = "LIMITED"
@@ -202,11 +204,31 @@ def motion_dispatch_error(inputs: dict[str, Any], *, cut_ids: list[str] | None =
         return None
     if not gate_applies(plan):
         return None
+    compile_err = _motion_obligation_error(plan, ids)
+    if compile_err:
+        return compile_err
     try:
         assert_dispatch(plan, project_dir=project_dir, cut_ids=ids)
     except ShotGateError as exc:
         return str(exc)
     return _overlay_l0_error(inputs, plan)
+
+
+def _motion_obligation_error(plan: dict[str, Any], cut_ids: list[str] | None) -> str | None:
+    from lib.motion_obligation import ShotCompileError, compile_cut
+
+    scenes = [row for row in (plan.get("scenes") or []) if isinstance(row, dict)]
+    by_id = {str(row.get("id")): row for row in scenes if row.get("id")}
+    if cut_ids is not None:
+        targets = [by_id[cut_id] for cut_id in cut_ids if cut_id in by_id]
+    else:
+        targets = [row for row in scenes if row.get("review_decision") != "omit"]
+    for scene in targets:
+        try:
+            compile_cut(scene)
+        except ShotCompileError as exc:
+            return str(exc)
+    return None
 
 
 def _overlay_l0_error(inputs: dict[str, Any], plan: dict[str, Any]) -> str | None:
@@ -265,4 +287,5 @@ def _cut_blockers(scene: dict[str, Any], project_dir: Path | None) -> list[str]:
         ids = scene.get("character_ids")
         if not isinstance(ids, list) or not [item for item in ids if str(item).strip()]:
             blockers.append(CHARACTER_IDS_MISSING)
+    blockers.extend(cut_variant_blockers(scene))
     return blockers

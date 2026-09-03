@@ -129,7 +129,8 @@ Sokka, half a step behind, replies: "Then we fight."
 - **Cinematic pipeline:** Seedance 2.0 is the default. 21:9, multi-shot for montage, reference-to-video when the brief has a visual bible.
 - **Animated explainer:** Use Seedance 2.0 only for establishing / mood / cold-open clips — core motion graphics stay in Remotion.
 - **Screen demo / podcast / clip factory:** Not the right default. Only for stylized cold-opens.
-- **Cost check:** `standard` at 10 s ≈ $3.03 / clip on fal.ai. `fast` at 5 s ≈ $1.21. Budget in the proposal stage.
+- **Cost check:** `standard` at 10 s ≈ $3.03 / clip on fal.ai. `fast` at 5 s ≈ $1.21. Budget in the proposal stage. Call `SeedanceVideo.execute` with `quote_only=true` before spend; do not blind-retry 402 / moderation.
+- **ShotContract packer:** `lib/seedance_ref_packer.py` collects SHOT_KEYFRAME then identity/scene refs and refuses >9 images. Identity stills from `character_variant` are not H3 first frames. Overlay: `skills/creative/short-drama-factory-adapters.md`.
 
 ## Example — Airbender trailer hero beat (60 s total trailer, this is shot 3 of 7)
 

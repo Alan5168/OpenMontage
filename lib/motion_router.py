@@ -1,11 +1,8 @@
 """Per-cut motion routing for the Limited Anime Studio.
 
-LIMITED is temporal grammar, not `ffmpeg -loop 1`.
-A cut may be an intentional 止め絵, camera-only, local motion (blink/mouth/steam),
-or must leave LIMITED when shot intent requires character performance.
-loop/zoom cannot impersonate performance. H3 is the motion department:
-I2V_HARD only, and only after the visual-constraint gate lets the cut leave planning.
-A4-class EST is Layout first, not a reason to call H3.
+LIMITED is declared temporal grammar (NONE/LOCAL), not the cheap fallback.
+PERFORMANCE / INTERACTION default to H3. Compile rejects still+zoom+loop
+on a dynamic ShotContract. loop/zoom cannot impersonate performance.
 """
 
 from __future__ import annotations
@@ -13,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from lib.motion_obligation import ShotCompileError, compile_cut  # noqa: E402
 from lib.shot_production_gate import PLANNING, UNCLASSIFIED, evaluate_cut, evaluate_plan
 
 ANIMATION_CLASSES = ("LIMITED", "I2V_STANDARD", "I2V_HARD")
@@ -87,8 +85,11 @@ def route_cut(
             "production_ready": False,
             "blockers": ["review_decision_omit"],
         }
-    if planned is not None:
-        animation_class_of(scene)
+    compiled = compile_cut(scene)
+    if planned is None:
+        scene = {**scene, "animation_class": compiled["dispatch_class"]}
+        planned = compiled["dispatch_class"]
+    animation_class_of(scene)
     root = Path(project_dir) if project_dir is not None else None
     gate = evaluate_cut(scene, scene_plan=scene_plan, project_dir=root)
     requested = str(scene.get("primary_model") or scene.get("motion_route") or "")

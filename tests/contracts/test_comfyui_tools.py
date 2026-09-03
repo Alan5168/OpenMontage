@@ -194,10 +194,12 @@ def test_h3_i2v_workflow_has_templated_nodes():
         w = json.load(f)
     assert w["7"]["class_type"] == "MiniMaxH3ImageToVideo"
     assert w["3"]["inputs"]["type"] == "minimax"
+    assert w["3"]["inputs"]["device"] == "cpu"
     assert w["16"]["class_type"] == "SaveVideo"
     assert w["1"]["inputs"]["unet_name"].startswith("MiniMax_H3")
     assert "18" not in w
     assert w["11"]["inputs"]["model"] == ["2", 0]
+    assert "MiniMaxH3PDDAccApply" not in json.dumps(w)
 
 
 def test_h3_metadata_stack_matches_keep_set():
@@ -263,6 +265,28 @@ class TestClientHelpers:
         with pytest.raises(ComfyUIError, match="Node errors"):
             ComfyUIClient("http://comfy.test").submit({})
 
+    def test_compact_execution_error_drops_latent_dump(self):
+        from tools._comfyui.client import compact_execution_error
+
+        messages = [
+            ["execution_start", {"prompt_id": "abc"}],
+            [
+                "execution_error",
+                {
+                    "node_id": "12",
+                    "node_type": "SamplerCustomAdvanced",
+                    "exception_type": "OSError",
+                    "exception_message": "[Errno 22] Invalid argument\n",
+                    "current_inputs": {"latent_image": ["tensor(" + ("0." * 5000) + ")"]},
+                },
+            ],
+        ]
+        text = compact_execution_error(messages)
+        assert "SamplerCustomAdvanced" in text
+        assert "Errno 22" in text
+        assert "tensor(" not in text
+        assert len(text) < 500
+
     def test_random_seed_range(self):
         from tools._comfyui.client import ComfyUIClient
         for _ in range(100):
@@ -303,6 +327,21 @@ class TestClientHelpers:
             "subfolder": "previews",
             "folder_type": "temp",
         }
+        assert client.last_timing["timing_source"] == "poll_wall"
+        assert client.last_timing["poll_interval_s"] == 5
+
+    def test_history_execution_seconds_from_messages(self):
+        from tools._comfyui.client import history_execution_seconds
+
+        entry = {
+            "status": {
+                "messages": [
+                    ["execution_start", {"timestamp": 1000.0}],
+                    ["execution_success", {"timestamp": 1077.5}],
+                ]
+            }
+        }
+        assert history_execution_seconds(entry) == 77.5
 
     def test_is_default_url_when_env_not_set(self, monkeypatch):
         from tools._comfyui.client import ComfyUIClient
@@ -485,8 +524,45 @@ class TestCustomWorkflowContract:
         assert result.data["fps"] == 24
         assert result.data["num_frames"] == 124
         assert result.data["hosted_minimax_ir"] is False
+        assert seen["workflow"]["3"]["inputs"]["device"] == "cpu"
         assert result.data["workflow_provenance"]["workflow"] == "minimax-h3-i2v.json"
         assert result.model == "minimax-h3"
+
+    def test_h3_ir_caps_eight_seconds_to_ship_grid(self, tmp_path):
+        tool = ComfyUIVideo()
+        tool._client.is_available = lambda: True
+        tool._client.check_models = lambda required: (list(required), [])
+        seen = {}
+
+        def fake_generate(workflow, output_node, dest, **kwargs):
+            seen["length"] = workflow["7"]["inputs"]["length"]
+            seen["clip_device"] = workflow["3"]["inputs"]["device"]
+            Path(dest).write_bytes(b"mp4")
+            return [Path(dest)]
+
+        tool._client.upload_image = lambda path, name: name
+        tool._client.generate = fake_generate
+        first = tmp_path / "first.jpg"
+        first.write_bytes(b"jpg")
+
+        result = tool.execute({
+            "operation": "image_to_video",
+            "workflow_model": "minimax-h3",
+            "h3_ir": {
+                "overview": "long beat",
+                "duration_seconds": 8,
+                "first_frame": str(first),
+            },
+            "output_path": str(tmp_path / "out.mp4"),
+            "seed": 1,
+        })
+
+        assert result.success is True
+        assert seen["length"] == 124
+        assert seen["clip_device"] == "cpu"
+        assert result.data["num_frames"] == 124
+        assert result.data["h3_ir"]["duration_capped_to_ship_grid"] is True
+        assert result.data["timing"]["wall_s"] is not None
 
     def test_image_missing_models_are_structured(self):
         tool = ComfyUIImage()

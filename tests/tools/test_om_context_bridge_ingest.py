@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 
 from tools import om_context_bridge as bridge
 
@@ -63,6 +64,28 @@ def test_semantic_probe_rejects_health_without_hits(monkeypatch):
 
     assert ok is False
     assert detail["hit_count"] == 0
+
+
+def test_ov_cli_strips_proxy_for_loopback(monkeypatch, tmp_path):
+    ov_bin = tmp_path / "ov.exe"
+    ov_bin.write_bytes(b"")
+    monkeypatch.setattr(bridge, "OV_BIN", ov_bin)
+    monkeypatch.setenv("HTTP_PROXY", "socks5h://127.0.0.1:1080")
+    monkeypatch.setenv("ALL_PROXY", "socks5h://127.0.0.1:1080")
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        captured["env"] = kwargs["env"]
+        return type("Result", (), {"returncode": 0, "stdout": "{}", "stderr": ""})()
+
+    monkeypatch.setattr(bridge.subprocess, "run", fake_run)
+
+    bridge._ov_cli(["health"])
+
+    assert "HTTP_PROXY" not in captured["env"]
+    assert "ALL_PROXY" not in captured["env"]
+    assert captured["env"]["NO_PROXY"] == "127.0.0.1,localhost,::1"
+    assert os.environ["HTTP_PROXY"].startswith("socks5h://")
 
 
 def test_ingest_calls_add_resource_before_claiming_success(tmp_path, monkeypatch, capsys):

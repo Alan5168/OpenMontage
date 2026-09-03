@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/teacher_trace",
+  "title": "Teacher Trace",
+  "description": "Thin OM record of one Xiaoyunque run vs Windows student. earliest_divergence is a causal hypothesis, not the verdict. Also store downstream_effect, human_preference, candidate_lesson, repeat_count. Promotion needs a held-out. auto_retrieve stays false.",
+  "type": "object",
+  "required": [
+    "schema",
+    "teacher",
+    "source_script_id",
+    "earliest_divergence",
+    "downstream_effect",
+    "human_preference",
+    "candidate_lesson",
+    "repeat_count",
+    "auto_retrieve"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema": { "type": "string", "const": "teacher-trace/v0.2" },
+    "teacher": {
+      "type": "string",
+      "enum": ["xiaoyunque", "minimax_hosted_h3", "other"]
+    },
+    "source_script_id": { "type": "string" },
+    "source_script_hash": { "type": "string" },
+    "credits_spent": { "type": ["number", "null"] },
+    "video_this_round": { "type": "boolean" },
+    "earliest_divergence": {
+      "type": "object",
+      "required": ["stage", "description"],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": [
+            "script_understanding",
+            "beat",
+            "anchors",
+            "composition_anchor",
+            "storyboard",
+            "shot_cut_plan",
+            "keyframe",
+            "prompt_context",
+            "renderer",
+            "qc_repair",
+            "unknown",
+            "not_run"
+          ]
+        },
+        "description": { "type": "string" }
+      }
+    },
+    "downstream_effect": {
+      "type": "object",
+      "required": ["keyframe", "video"],
+      "properties": {
+        "keyframe": { "type": "string", "enum": ["better", "same", "worse", "unknown"] },
+        "video": { "type": "string", "enum": ["better", "same", "worse", "not_run"] }
+      }
+    },
+    "human_preference": {
+      "type": "string",
+      "enum": ["teacher", "local", "neither", "not_compared"]
+    },
+    "candidate_lesson": { "type": "string" },
+    "repeat_count": { "type": "integer", "minimum": 0 },
+    "held_out": { "type": "object" },
+    "promotion_allowed": { "type": "boolean" },
+    "auto_retrieve": { "type": "boolean", "const": false }
+  }
+}

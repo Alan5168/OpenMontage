@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """项目绑定的 Prime Agent 交互式入口 (Direct Prime Console)。
 
 从当前 OM project 的 working/prime_rlm/SESSION_POINTER.json 解析完整 .jsonl 路径，
@@ -41,8 +41,8 @@ ADAPTER_SKILL = REPO / "integrations" / "prime-om-adapter"
 FORBIDDEN_FLAGS = {"--no-session", "--no-tools"}
 
 # 默认 provider/model（仅当项目配置中完全缺失时作为最后手段）
-DEFAULT_PROVIDER = "bailian"
-DEFAULT_MODEL = "qwen3.8-max"
+DEFAULT_PROVIDER = "longcat"
+DEFAULT_MODEL = "LongCat-2.0"
 
 
 class PrimeChatError(RuntimeError):
@@ -149,6 +149,10 @@ def build_launch_env(pointer: dict[str, Any], project_id: str) -> dict[str, str]
     不包含任何 credential。
     """
     env = os.environ.copy()
+    for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+        env.pop(name, None)
+    env["NO_PROXY"] = "127.0.0.1,localhost,::1"
+    env["no_proxy"] = "127.0.0.1,localhost,::1"
 
     # 设置隔离的 agent 目录
     agent_dir = pointer.get("agent_dir")
@@ -166,6 +170,14 @@ def build_launch_env(pointer: dict[str, Any], project_id: str) -> dict[str, str]
     # kernel python
     kernel = pointer.get("kernel_python") or str(DEFAULT_KERNEL)
     env["PRIME_AGENT_KERNEL_PYTHON"] = kernel
+
+    adapter_src = str(ADAPTER_SKILL / "src")
+    om_repo = str(REPO)
+    existing = env.get("PYTHONPATH", "")
+    parts = [adapter_src, om_repo]
+    if existing:
+        parts.append(existing)
+    env["PYTHONPATH"] = os.pathsep.join(parts)
 
     return env
 

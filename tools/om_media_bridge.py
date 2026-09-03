@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Qdrant media bridge for OpenMontage.
 
-提供 nf_stock_footage_v1 素材检索/解析/健康检查命令。
-调用现有 Windows Qdrant（127.0.0.1:6333），不重嵌入、不复制第二份向量。
-embedding 使用本地 Qwen3-Embedding-0.6B 服务；HTTP 走 stdlib urllib，无需额外依赖。
+提供 nf_stock_footage_v2 素材检索/解析/健康检查命令。
+调用现有 Windows Qdrant（127.0.0.1:6333），不复制第二份向量。
+embedding：火山方舟 CodingPlan doubao-embedding-vision（文本端点，1024 维）。
+历史：本地 Qwen3-Embedding-0.6B 服务（18889）已于 2026-09-03 永久下线；
+v1 collection（旧 Qwen 向量）保留作回滚，可通过 QDRANT_COLLECTION 环境变量切回。
+API key 从 HKCU 用户环境变量 OPENVIKING_ARK_EMBEDDING_API_KEY 读取，不落盘。
+HTTP 走 stdlib urllib，无需额外依赖。
 """
 
 from __future__ import annotations
@@ -18,21 +22,27 @@ from typing import Any
 from urllib import request as urlrequest
 from urllib.error import URLError
 
+try:
+    import winreg
+except ImportError:  # 非 Windows 退化
+    winreg = None
+
 # Qdrant 配置（loopback-only）
 QDRANT_BASE_URL = os.environ.get("QDRANT_BASE_URL", "http://127.0.0.1:6333")
-COLLECTION_NAME = os.environ.get("QDRANT_COLLECTION", "nf_stock_footage_v1")
+COLLECTION_NAME = os.environ.get("QDRANT_COLLECTION", "nf_stock_footage_v2")
 
 # 素材根目录
 MEDIA_STOCK_ROOT = Path(
     os.environ.get("MEDIA_STOCK_ROOT", r"C:\ContentStudio\media\stock")
 )
 
-# embedding 服务端点：与 OpenViking 共用 18889，禁止再默认 8001。
-EMBEDDING_URL = os.environ.get("EMBEDDING_URL", "http://127.0.0.1:18889/embed")
-EMBEDDING_OPENAI_URL = os.environ.get(
-    "EMBEDDING_OPENAI_URL", "http://127.0.0.1:18889/v1/embeddings"
+# embedding：火山方舟 CodingPlan doubao-embedding-vision（文本查询端点，与 v2 入库同空间）
+ARK_EMBEDDING_URL = os.environ.get(
+    "ARK_EMBEDDING_URL",
+    "https://ark.cn-beijing.volces.com/api/coding/v3/embeddings",
 )
-EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "qwen3-embedding-0.6b")
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "doubao-embedding-vision")
+EMBEDDING_DIMS = 1024
 MIN_IMAGE_BYTES = 1024
 
 # license_risk 等级映射，用于 license-policy 过滤
@@ -94,25 +104,52 @@ def _extract_vector(resp: Any) -> list[float] | None:
     return None
 
 
-def _embed_query(query: str) -> list[float]:
-    """调用本地 18889 embedding；兼容 /embed 与 OpenAI /v1/embeddings。"""
-    errors: list[str] = []
-    for url, body in (
-        (EMBEDDING_URL, {"text": query, "model": EMBEDDING_MODEL}),
-        (EMBEDDING_OPENAI_URL, {"input": query, "model": EMBEDDING_MODEL}),
-    ):
+def _get_api_key() -> str | None:
+    """读取火山方舟 API key：HKCU 用户环境变量优先，进程环境变量兜底。"""
+    if winreg is not None:
         try:
-            resp = _http_post_json(url, body, timeout=60)
-        except (URLError, OSError) as e:
-            errors.append(f"{url}: {type(e).__name__}: {e}")
-            continue
-        vec = _extract_vector(resp)
-        if vec:
-            return vec
-        errors.append(f"{url}: unexpected payload keys={list(resp)[:8] if isinstance(resp, dict) else type(resp).__name__}")
-    raise MediaBridgeError(
-        "embedding 服务不可用 (canonical 18889): " + " | ".join(errors)
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as k:
+                v, _ = winreg.QueryValueEx(k, "OPENVIKING_ARK_EMBEDDING_API_KEY")
+                if v:
+                    return v
+        except OSError:
+            pass
+    return os.environ.get("OPENVIKING_ARK_EMBEDDING_API_KEY")
+
+
+def _embed_query(query: str) -> list[float]:
+    """调用火山方舟文本 embedding 端点（doubao-embedding-vision, 1024 维）。"""
+    key = _get_api_key()
+    if not key:
+        raise MediaBridgeError(
+            "缺少 OPENVIKING_ARK_EMBEDDING_API_KEY（HKCU 用户环境变量或进程环境变量）"
+        )
+    body = {
+        "model": EMBEDDING_MODEL,
+        "input": [query],
+        "dimensions": EMBEDDING_DIMS,
+    }
+    req = urlrequest.Request(
+        ARK_EMBEDDING_URL,
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {key}",
+        },
     )
+    try:
+        with urlrequest.urlopen(req, timeout=60) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except URLError as e:
+        raise MediaBridgeError(
+            f"火山方舟 embedding 调用失败: {type(e).__name__}: {e}"
+        )
+    vec = _extract_vector(payload)
+    if not vec or len(vec) != EMBEDDING_DIMS:
+        raise MediaBridgeError(
+            f"embedding 返回异常: dims={len(vec) if vec else 0}, expected={EMBEDDING_DIMS}"
+        )
+    return vec
 
 
 def _qdrant_search(
@@ -178,7 +215,7 @@ def cmd_search(args: argparse.Namespace) -> None:
         "status": status,
         "query": args.query,
         "collection": COLLECTION_NAME,
-        "embedding_url": EMBEDDING_URL,
+        "embedding_model": EMBEDDING_MODEL,
         "top_k": args.top_k,
         "license_policy": args.license_policy,
         "match_count": len(results),
@@ -269,9 +306,11 @@ def cmd_health(args: argparse.Namespace) -> None:
 
     embed_ok, embed_detail = False, ""
     try:
-        status_code, body = _http_get("http://127.0.0.1:18889/health", timeout=3)
-        embed_ok = status_code == 200
-        embed_detail = body.strip()[:300]
+        vec = _embed_query("health probe")
+        embed_ok = len(vec) == EMBEDDING_DIMS
+        embed_detail = f"ark text endpoint OK, dims={len(vec)}"
+    except MediaBridgeError as e:
+        embed_detail = str(e)
     except Exception as e:
         embed_detail = f"{type(e).__name__}: {e}"
 
@@ -290,11 +329,12 @@ def cmd_health(args: argparse.Namespace) -> None:
             "expected_points": 14133,
         },
         "embedding": {
-            "url": EMBEDDING_URL,
-            "openai_url": EMBEDDING_OPENAI_URL,
+            "provider": "volcengine-ark-codingplan",
+            "url": ARK_EMBEDDING_URL,
+            "model": EMBEDDING_MODEL,
+            "dims": EMBEDDING_DIMS,
             "reachable": embed_ok,
             "detail": embed_detail,
-            "canonical_port": 18889,
         },
         "media": {
             "stock_root": str(MEDIA_STOCK_ROOT),

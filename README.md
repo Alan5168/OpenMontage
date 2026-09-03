@@ -483,7 +483,7 @@ Each tool declares which Layer 3 skills it relies on. The agent reads Layer 1 to
 > **Full setup guide with pricing and free tiers:** [`docs/PROVIDERS.md`](docs/PROVIDERS.md)
 
 <details>
-<summary><strong>Video Generation — 15 providers</strong></summary>
+<summary><strong>Video Generation — 16 providers</strong></summary>
 
 | Provider | Type | Notes |
 |----------|------|-------|
@@ -492,6 +492,7 @@ Each tool declares which Layer 3 skills it relies on. The agent reads Layer 1 to
 | **Runway Gen-4** | Cloud API | Cinematic quality, Gen-3 Alpha Turbo / Gen-4 Turbo / Gen-4 Aleph |
 | **Google Veo 3** | Cloud API | Long-form, cinematic. Via fal.ai or HeyGen. |
 | **Grok Imagine Video** | Cloud API | Strong reference-image video and xAI-native short-form generation |
+| **Agnes Video 2.0** | Cloud API | Text/image/keyframe video generation under the Agnes multimodal key |
 | **Higgsfield** | Cloud API | Multi-model orchestrator with Soul ID for character consistency |
 | **MiniMax** | Cloud API | Cost-effective |
 | **HeyGen** | Cloud API | Multi-model gateway |
@@ -506,13 +507,14 @@ Each tool declares which Layer 3 skills it relies on. The agent reads Layer 1 to
 </details>
 
 <details>
-<summary><strong>Image Generation — 11 tools/providers</strong></summary>
+<summary><strong>Image Generation — 12 tools/providers</strong></summary>
 
 | Provider | Type | Notes |
 |----------|------|-------|
 | **FLUX** | Cloud API | State-of-the-art quality |
 | **Google Imagen** | Cloud API | Imagen 4 — high-quality, multiple aspect ratios |
 | **Grok Imagine Image** | Cloud API | Strong image edits, style transfer, and multi-image compositing |
+| **Agnes Image 2.1** | Cloud API | Text-to-image, image editing, and multi-image composition |
 | **GPT Image 2** | Cloud API | OpenAI's image model |
 | **Recraft** | Cloud API | Design-focused generation |
 | **Kling Official** | Cloud API | Official direct API for Kling image generation and reference workflows |

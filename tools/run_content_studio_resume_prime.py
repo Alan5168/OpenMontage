@@ -185,6 +185,10 @@ def run_resume(project_id: str | None) -> dict:
         raise RuntimeError("forbidden fake-resume flags present")
 
     env = os.environ.copy()
+    for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+        env.pop(name, None)
+    env["NO_PROXY"] = "127.0.0.1,localhost,::1"
+    env["no_proxy"] = "127.0.0.1,localhost,::1"
     env["OM_PRIME_ADAPTER_ROOT"] = str(ROOT)
     env["OPENMONTAGE_PROJECTS_DIR"] = os.environ.get("OPENMONTAGE_PROJECTS_DIR", str(ROOT / "jobs"))
     env["PRIME_AGENT_KERNEL_PYTHON"] = kernel

@@ -1,0 +1,28 @@
+{
+  "schema_version": "windows-studio-go-live/v0.1",
+  "not": ["Scene A looks good", "T1-T14 all green", "PRIME_FOREMAN_PROVEN"],
+  "proven_status": "PRIME_PRODUCTION_INTERFACE_READY",
+  "foreman_proven": false,
+  "go_live": "Without Cursor as foreman, Alan starts a real scene production goal from Windows Prime. The system completes ContentIR → rollout → SEE → repair → Backlot. Alan only makes a few preference decisions.",
+  "production_graph": [
+    "Alan",
+    "Windows Prime Agent TUI",
+    "Prime RLM / Skills",
+    "OM canonical state + ContentIR",
+    "OpenViking Context",
+    "Renderer Router: LIMITED | H3 FL2VA (default PERFORMANCE) | H3 Ref2VA / cloud fallback",
+    "Observation / SEE",
+    "Prime repair policy",
+    "bounded rollout",
+    "Backlot",
+    "Alan: CONTINUE_SCENE / STOP / REVISE / A / B / neither"
+  ],
+  "cursor": "Harness engineer / maintainer. May change code. Must not be production foreman.",
+  "motion_policy": {
+    "PERFORMANCE": "H3 FL2VA default first experiment. Compile fail if LIMITED/local_compose/ffmpeg loop.",
+    "INTERACTION": "Preferred renderer h3_ref2va. Compile blocks R2VA_RUNTIME_UNAVAILABLE until Ref2VA unet + R2V workflow exist. Do not pretend FL2VA is Ref2VA.",
+    "NONE_LOCAL": "LIMITED only when declared. Intentional hold must be explicit.",
+    "h3_failure": "H3 rollout → Observation → repair/retry → provider fallback → split/scene repair. Never PNG+ffmpeg loop as a substitute for performance."
+  },
+  "next_acceptance_test": "vid-scene-revise-v1 frozen SCENE_REVISION_ROUTING_PROVEN. SCENE_REVISION_EFFECTIVENESS not proven (V2 still-hold did not address steam/static). Do not polish that fixture. Do not stamp SCENE_REVISION_EFFECTIVENESS_PROVEN. Resume/idempotency from existing B2 Observation-rebind; do not burn H3. Do not stamp LIGHTS_OUT_SCENE_PRODUCTION_PROVEN or PRIME_FOREMAN_PROVEN."
+}

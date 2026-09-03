@@ -8,6 +8,11 @@ ComfyUI node. It does **not** call MiniMax cloud IR, does **not** ask a VLM
 to "enhance" (that is how A5 grew a smile and a push-in), and does **not**
 PASS/APPROVE anything.
 
+Dialect authority is the vendored MiniMax skill
+``vendor/minimax-h3/h3-prompt-writing`` (base-en.txt). This compiler
+**translates** a ShotContract into that dialect. It does not direct the
+shot. Ref2VA six-section rewrite is not in this function; see ref-en.txt.
+
 Input: structured cut context (identity, shots, camera, audio, avoid).
 Output: a prompt string H3-Base / MiniMaxH3ImageToVideo can eat, plus the
 frame grid H3 snaps to (24 fps, length ≡ 5 mod 17).
@@ -23,6 +28,39 @@ FPS = 24
 # MiniMaxH3ImageToVideo snaps length so n % 17 == 5 (124 ≈ 5s).
 _FRAME_MOD = 17
 _FRAME_REM = 5
+SHIP_SECONDS = 5.0
+SHIP_FRAMES = 124  # frames_for_duration(5)
+
+# Official MiniMax H3-Base field names (skills/h3-prompt-writing/references/base-en.txt).
+OFFICIAL_CORE_FIELDS = (
+    "integrated_multimodal_description",
+    "overall_soundscape",
+    "non_diegetic_music",
+)
+I2VA_ALIGN = (
+    "For the target video, at 0.00 seconds into the target video, "
+    "<Picture 1> (from [Shot 1]) is fully referenced."
+)
+R2VA_NOT_IN_BASE_COMPILER = (
+    "R2VA_PROMPT_NOT_IN_BASE_COMPILER: Ref2VA uses the six-section rewrite in "
+    "vendor/minimax-h3/h3-prompt-writing/references/ref-en.txt. "
+    "Do not emit the three-field I2VA/T2VA prompt and call it R2VA. "
+    "Ref2VA weights are a separate runtime gate in lib/h3_runtime.py."
+)
+
+
+def ship_duration_seconds(requested: float, *, allow_long: bool = False) -> float:
+    """5070 Ti ship grid. 8s → 192 frames is superlinear; default cap is 5s.
+
+    Set ``h3_allow_long`` on the spec/shot to keep 6–15s. Frozen jobs are not
+    re-run; this only affects new compiles.
+    """
+    duration = float(requested)
+    if duration < 4 or duration > 15:
+        raise ValueError(f"H3 duration must be 4-15s, got {duration}")
+    if allow_long:
+        return duration
+    return min(duration, SHIP_SECONDS)
 
 
 def align_frame_count(n: int) -> int:
@@ -41,14 +79,14 @@ def compile_h3_ir(spec: dict[str, Any]) -> dict[str, Any]:
 
     Required-ish keys (all optional except that the result must be non-empty):
       overview, identity, shots[], camera, audio[], avoid[], duration_seconds,
-      width, height, mode (i2va|t2va|r2va), style
+      width, height, mode (i2va|t2va|fl2va|l2va|r2va), style
     """
     if not isinstance(spec, dict) or not spec:
         raise ValueError("h3_ir spec must be a non-empty object")
 
-    duration = float(spec.get("duration_seconds") or 5)
-    if duration < 4 or duration > 15:
-        raise ValueError(f"H3 duration must be 4-15s, got {duration}")
+    requested = float(spec.get("duration_seconds") or SHIP_SECONDS)
+    allow_long = bool(spec.get("h3_allow_long"))
+    duration = ship_duration_seconds(requested, allow_long=allow_long)
     length = frames_for_duration(duration)
     width = int(spec.get("width") or 1344)
     height = int(spec.get("height") or 768)
@@ -57,16 +95,22 @@ def compile_h3_ir(spec: dict[str, Any]) -> dict[str, Any]:
         mode = "fl2va"
     if mode not in {"i2va", "t2va", "fl2va", "l2va", "r2va"}:
         raise ValueError(f"unknown H3 mode: {mode}")
+    if mode == "r2va":
+        raise ValueError(R2VA_NOT_IN_BASE_COMPILER)
 
     prompt = _render_prompt(spec, duration)
     avoid = _list(spec.get("avoid"))
     return {
         "schema_version": "h3-context-ir/v0.2",
         "hosted_minimax_ir": False,
+        "prompt_dialect": "minimax-h3-prompt-writing/base-en",
         "mode": mode,
         "prompt": prompt,
         "avoid": avoid,
+        "requested_duration_seconds": requested,
         "duration_seconds": duration,
+        "duration_capped_to_ship_grid": (not allow_long) and requested > SHIP_SECONDS,
+        "h3_allow_long": allow_long,
         "length": length,
         "fps": FPS,
         "width": width,
@@ -89,7 +133,15 @@ def compile_from_scene(
         spec.setdefault("duration_seconds", scene.get("duration_seconds") or scene.get("duration"))
         spec.setdefault("first_frame", scene.get("first_frame") or scene.get("visual_ref"))
         spec.setdefault("last_frame", scene.get("last_frame"))
-        spec.setdefault("identity", scene.get("identity") or spec.get("identity"))
+        if not spec.get("identity"):
+            from lib.character_variant import identity_from_variant
+
+            spec["identity"] = scene.get("identity") or identity_from_variant(scene) or spec.get("identity") or {}
+        spec.setdefault("h3_allow_long", scene.get("h3_allow_long"))
+        spec.setdefault(
+            "experimental_reference_binding",
+            scene.get("experimental_reference_binding"),
+        )
         return compile_h3_ir(spec)
 
     sl = scene.get("shot_language") or {}
@@ -105,7 +157,7 @@ def compile_from_scene(
         or scene.get("style")
         or "limited TV anime",
         "overview": scene.get("description") or scene.get("intent") or "",
-        "identity": scene.get("identity") or {},
+        "identity": scene.get("identity") or _identity_from_variant(scene) or {},
         "duration_seconds": scene.get("duration_seconds") or scene.get("duration") or 5,
         "width": scene.get("width") or 1344,
         "height": scene.get("height") or 768,
@@ -125,8 +177,16 @@ def compile_from_scene(
         "avoid": scene.get("avoid") or [],
         "first_frame": scene.get("first_frame") or scene.get("visual_ref"),
         "last_frame": scene.get("last_frame"),
+        "h3_allow_long": scene.get("h3_allow_long"),
+        "experimental_reference_binding": scene.get("experimental_reference_binding"),
     }
     return compile_h3_ir(spec)
+
+
+def _identity_from_variant(scene: dict[str, Any]) -> dict[str, Any]:
+    from lib.character_variant import identity_from_variant
+
+    return identity_from_variant(scene)
 
 
 def _list(value: Any) -> list[str]:
@@ -144,19 +204,26 @@ def _render_prompt(spec: dict[str, Any], duration: float) -> str:
         mode = "fl2va"
     duration_s = f"{duration:.2f}"
     parts: list[str] = []
+    last_shot = max(1, len(spec.get("shots") or []) or 1)
+    if mode == "r2va":
+        raise ValueError(R2VA_NOT_IN_BASE_COMPILER)
     if mode == "fl2va":
         parts.append(
             "How the reference pictures align with the target video — "
             "Picture 1 (from Shot 1) aligns with the 0.00-second mark of the "
-            f"target video; Picture 2 (from Shot 1) aligns with the {duration_s}-second "
-            "mark of the target video."
+            f"target video; Picture 2 (from Shot {last_shot}) aligns with the "
+            f"{duration_s}-second mark of the target video."
+        )
+        parts.append("")
+    elif mode == "l2va":
+        parts.append(
+            "How the reference pictures align with the target video — "
+            f"<Picture 1> (from [Shot {last_shot}]) aligns with the "
+            f"{duration_s}-second mark of the target video."
         )
         parts.append("")
     elif mode != "t2va":
-        parts.append(
-            "For the target video, at 0.00 seconds into the target video, "
-            "<Picture 1> (from [Shot 1]) is fully referenced."
-        )
+        parts.append(I2VA_ALIGN)
         parts.append("")
 
     parts.append(
@@ -165,7 +232,11 @@ def _render_prompt(spec: dict[str, Any], duration: float) -> str:
     parts.append("")
     parts.append("overall_soundscape: " + _soundscape(spec))
     parts.append("")
-    music = str(spec.get("non_diegetic_music") or "").strip()
+    music = str(
+        spec.get("non_diegetic_music")
+        or spec.get("non_diegetic_score")
+        or ""
+    ).strip()
     parts.append("non_diegetic_music: " + (music if music else "N/A"))
     return "\n".join(parts)
 
@@ -191,7 +262,10 @@ def _camera_sentence(camera: str) -> str:
 def _multimodal_body(spec: dict[str, Any], duration: float) -> str:
     style = _style_token(str(spec.get("style") or "limited TV anime"))
     identity = spec.get("identity") or {}
-    ident = _identity_line(identity)
+    ident = _identity_line(
+        identity,
+        experimental=bool(spec.get("experimental_reference_binding")),
+    )
     overview = str(spec.get("overview") or "").strip()
     camera = str(spec.get("camera") or "locked-off static").strip()
     cam_sentence = _camera_sentence(camera)
@@ -206,7 +280,7 @@ def _multimodal_body(spec: dict[str, Any], duration: float) -> str:
             "camera": camera,
         }]
 
-    if locked:
+    if locked and len(shots) <= 1:
         first = shots[0]
         framing = first.get("framing") or "medium close-up"
         actions = " ".join(
@@ -237,9 +311,15 @@ def _multimodal_body(spec: dict[str, Any], duration: float) -> str:
             chunks.append(bit)
         else:
             stamp = _shot_timestamp(t0)
-            chunks.append(
-                f"[Shot {i}] At {stamp}, the camera cuts to a {framing}. {action} {cam}"
-            )
+            t1 = float(shot.get("t1") or duration)
+            if locked:
+                chunks.append(
+                    f"[Shot {i}] At {stamp}, same locked setup {t0:.2f}–{t1:.2f}s. {action}"
+                )
+            else:
+                chunks.append(
+                    f"[Shot {i}] At {stamp}, the camera cuts to a {framing}. {action} {cam}"
+                )
     chunks.append(_negatives(spec))
     return " ".join(c.strip() for c in chunks if c.strip())
 
@@ -282,12 +362,54 @@ def _negatives(spec: dict[str, Any]) -> str:
         if key in seen:
             continue
         seen.add(key)
+        if key == "walk cycle" and _locomotion(spec):
+            continue
         bits.append(_NEGATIVE_PHRASES.get(key, f"Do not introduce {item}."))
-    bits.append(
-        "The character, room, and prop states remain as in <Picture 1>. "
-        "Do not invent a smile, a walk cycle, or a new prop state."
-    )
+    if _locomotion(spec):
+        bits.append(
+            "The character, room, and prop states remain as in <Picture 1>. "
+            "Do not invent a smile or a new prop state. "
+            "Perform the declared temporal beats. Alternate legs. No skating."
+        )
+    else:
+        bits.append(
+            "The character, room, and prop states remain as in <Picture 1>. "
+            "Do not invent a smile, a walk cycle, or a new prop state."
+        )
     return " ".join(bits)
+
+
+_LOCO_WORDS = (
+    "walk",
+    "run",
+    "bolt",
+    "sprint",
+    "arriv",
+    "gait",
+    "footstep",
+    "locomotion",
+)
+
+
+def _locomotion(spec: dict[str, Any]) -> bool:
+    if "locomotion" in spec:
+        return bool(spec.get("locomotion"))
+    for shot in spec.get("shots") or []:
+        if isinstance(shot, dict) and shot.get("atom_id") in {
+            "one_step",
+            "two_step_stop",
+            "controlled_approach",
+            "decelerate_stop",
+        }:
+            return True
+    blob = " ".join(
+        [
+            str(spec.get("overview") or ""),
+            str(spec.get("action") or ""),
+            " ".join(str(s.get("action") or "") for s in (spec.get("shots") or []) if isinstance(s, dict)),
+        ]
+    ).lower()
+    return any(word in blob for word in _LOCO_WORDS)
 
 
 def _soundscape(spec: dict[str, Any]) -> str:
@@ -301,7 +423,7 @@ def _soundscape(spec: dict[str, Any]) -> str:
     return joined + ". No non-diegetic score. No new spoken dialogue."
 
 
-def _identity_line(identity: Any) -> str:
+def _identity_line(identity: Any, *, experimental: bool = False) -> str:
     if not identity:
         return ""
     if isinstance(identity, str):
@@ -313,6 +435,12 @@ def _identity_line(identity: Any) -> str:
         bits.append(f"The locked character is {name}, matching <Picture 1>.")
     if must:
         bits.append("Appearance stays: " + ", ".join(must) + ".")
+    if experimental:
+        from lib.reference_binding import compile_bindings_stanza
+
+        stanza = compile_bindings_stanza(identity.get("reference_bindings"))
+        if stanza:
+            bits.append(stanza)
     return " ".join(bits)
 
 

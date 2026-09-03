@@ -46,6 +46,8 @@ _T2V_OUTPUT_NODE = "16"
 _I2V_OUTPUT_NODE = "108"
 _H3_I2V_OUTPUT_NODE = "16"
 _H3_WORKFLOW_KEYS = frozenset({"minimax-h3", "minimax-h3-i2v", "h3", "h3-comfyui"})
+_H3_POLL_INTERVAL_S = 2
+_H3_CLIP_DEVICE = "cpu"
 
 # Models required by the bundled WAN 2.2 workflows
 _REQUIRED_MODELS_COMMON = [
@@ -303,7 +305,8 @@ class ComfyUIVideo(BaseTool):
 
     def estimate_runtime(self, inputs: dict[str, Any]) -> float:
         if _wants_h3(inputs):
-            return 600.0  # ~10 min on 5070 Ti 16GB, 1344x768, 124 frames
+            # Budget, not a measurement. 124-frame ship grid + CPU CLIP.
+            return 300.0
         operation = inputs.get("operation", "text_to_video")
         if operation == "image_to_video":
             return 210.0  # ~3.5 min
@@ -383,18 +386,21 @@ class ComfyUIVideo(BaseTool):
                         f"See data.missing_models for destination hints and download URLs."
                     ),
                 )
-        start = time.time()
+        start = time.perf_counter()
         seed = inputs.get("seed") or ComfyUIClient.random_seed()
         output_path = Path(
             inputs.get("output_path", f"comfyui_video_{operation}_{seed}.mp4")
         )
+        stage_s = 0.0
 
         try:
             if custom_workflow:
                 workflow = self._load_custom_workflow(inputs)
                 output_node = str(inputs["output_node"])
             elif wants_h3:
+                staged = time.perf_counter()
                 workflow, output_node = self._build_h3_i2v(inputs, seed, output_path)
+                stage_s = round(time.perf_counter() - staged, 3)
             elif operation == "image_to_video":
                 workflow, output_node = self._build_i2v(inputs, seed, output_path)
             else:
@@ -403,12 +409,13 @@ class ComfyUIVideo(BaseTool):
             provenance = self._workflow_provenance(
                 inputs, custom_workflow, output_node, operation, workflow, wants_h3=wants_h3
             )
+            poll_interval = _H3_POLL_INTERVAL_S if wants_h3 else 10
             paths = self._client.generate(
                 workflow,
                 output_node=output_node,
                 dest=output_path,
                 timeout=900,
-                interval=10,
+                interval=poll_interval,
             )
 
         except ComfyUIError as exc:
@@ -448,13 +455,27 @@ class ComfyUIVideo(BaseTool):
                 "avoid": compiled["avoid"],
                 "length": compiled["length"],
                 "camera_lock": compiled["camera_lock"],
+                "requested_duration_seconds": compiled.get("requested_duration_seconds"),
+                "duration_capped_to_ship_grid": compiled.get("duration_capped_to_ship_grid"),
             }
+        wall = round(time.perf_counter() - start, 3)
+        comfy_timing = dict(getattr(self._client, "last_timing", None) or {})
+        exec_s = comfy_timing.get("comfy_prompt_exec_s")
+        overhead = wall
+        if isinstance(exec_s, (int, float)):
+            overhead = round(max(0.0, wall - float(exec_s)), 3)
+        data["timing"] = {
+            **comfy_timing,
+            "harness_stage_s": stage_s,
+            "harness_overhead_s": overhead,
+            "wall_s": wall,
+        }
         return ToolResult(
             success=True,
             data=data,
             artifacts=[str(p) for p in paths],
             cost_usd=0.0,
-            duration_seconds=round(time.time() - start, 2),
+            duration_seconds=wall,
             seed=seed,
             model=model_name,
         )
@@ -526,6 +547,7 @@ class ComfyUIVideo(BaseTool):
 
         workflow = ComfyUIClient.load_workflow(_WORKFLOWS / "minimax-h3-i2v.json")
         patches = {
+            "3": {"device": _H3_CLIP_DEVICE},
             "6": {"image": server_name},
             "7": {
                 "prompt": inputs["prompt"],

@@ -2,6 +2,9 @@
 
 Pixel motion is not character performance. Grammar-clear is not director-reviewable.
 High-cost visual critique is illegal while this report says ineligible.
+
+LIMITED_LOCAL (steam / HUD / ambient) does not realize a PERFORMANCE obligation.
+Intentional STATIC_HOLD is legal when the shot did not declare performance.
 """
 
 from __future__ import annotations
@@ -9,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from lib.creative_loop import CreativeLoopError
+from lib.motion_obligation import DYNAMIC, ShotCompileError, resolve_motion_obligation
 
 REPORT_VERSION = "scene-eligibility/v0.1"
 
@@ -16,6 +20,7 @@ KEN_BURNS_MAX_FRACTION = 0.20
 SOURCE_REUSE_MAX_FRACTION = 0.25
 FIRST_SOUND_MAX_SECONDS = 0.5
 SILENCE_DB = -40.0
+CHARACTER_PERFORMANCE_TYPES = frozenset({"FULL_MOTION"})
 
 
 def evaluate_scene_eligibility(
@@ -59,9 +64,10 @@ def evaluate_scene_eligibility(
             blockers.append("audio_timeline_incomplete")
 
     split = _motion_split(temporal_report, cuts)
-    for cut in cuts:
-        if cut.get("requires_performance") and _cut_has_no_performance(cut, temporal_report):
-            blockers.append(f"performance_shot_without_character_motion:{cut.get('id')}")
+    realization = _temporal_intent_realization(cuts, temporal_report)
+    for row in realization:
+        if row["result"] == "FAIL":
+            blockers.append(f"performance_shot_without_character_motion:{row['cut_id']}")
             break
 
     eligible = not blockers
@@ -80,6 +86,7 @@ def evaluate_scene_eligibility(
         "placeholder_composite_present": placeholder,
         "unplanned_audio_silence_seconds": round(float(audio_map.get("unplanned_silence_seconds") or 0), 3),
         "first_sound_seconds": first_sound,
+        "temporal_intent_realization": realization,
         "judgment": "eligibility_only",
         "note": "Ineligible means technical previz. Do not call a high-cost visual critic. Do not offer as scene master.",
     }
@@ -138,15 +145,87 @@ def _motion_split(temporal: dict[str, Any] | None, cuts: list[dict[str, Any]]) -
     }
 
 
-def _cut_has_no_performance(cut: dict[str, Any], temporal: dict[str, Any] | None) -> bool:
+def _cut_window(cut: dict[str, Any]) -> tuple[float, float]:
+    t0 = cut.get("t_start", cut.get("start_seconds"))
+    t1 = cut.get("t_end", cut.get("end_seconds"))
+    start = float(t0 or 0)
+    end = float(t1 if t1 is not None else start)
+    return start, end
+
+
+def _obligation(cut: dict[str, Any]) -> str:
+    try:
+        return resolve_motion_obligation(cut)
+    except ShotCompileError:
+        if cut.get("requires_performance") is True:
+            return "PERFORMANCE"
+        return "NONE"
+
+
+def _performance_windows(cut: dict[str, Any]) -> list[tuple[float, float, str]]:
+    """Windows that must show character performance, not FX MAD."""
+    cut_t0, cut_t1 = _cut_window(cut)
+    windows: list[tuple[float, float, str]] = []
+    for beat in cut.get("temporal_beats") or []:
+        if not isinstance(beat, dict):
+            continue
+        kind = str(beat.get("kind") or "").strip().upper()
+        if kind != "CHARACTER_PERFORMANCE":
+            continue
+        b0 = float(beat.get("t_start") if beat.get("t_start") is not None else cut_t0)
+        b1 = float(beat.get("t_end") if beat.get("t_end") is not None else cut_t1)
+        windows.append((b0, b1, kind))
+    if windows:
+        return windows
+    if _obligation(cut) in DYNAMIC or cut.get("requires_performance") is True:
+        return [(cut_t0, cut_t1, "CHARACTER_PERFORMANCE")]
+    return []
+
+
+def _overlapping_types(
+    temporal: dict[str, Any] | None,
+    t0: float,
+    t1: float,
+) -> list[str]:
     if not temporal:
-        return True
-    t0 = float(cut.get("t_start") or 0)
-    t1 = float(cut.get("t_end") or t0)
-    segs = [s for s in (temporal.get("segments") or []) if isinstance(s, dict)]
-    kinds = []
-    for seg in segs:
+        return []
+    kinds: list[str] = []
+    for seg in temporal.get("segments") or []:
+        if not isinstance(seg, dict):
+            continue
         a, b = float(seg.get("t_start") or 0), float(seg.get("t_end") or 0)
         if b > t0 and a < t1:
-            kinds.append(str(seg.get("motion_type")))
-    return bool(kinds) and set(kinds) <= {"STATIC_HOLD", "CAMERA_ONLY"}
+            kinds.append(str(seg.get("motion_type") or ""))
+    if kinds:
+        return kinds
+    motion = temporal.get("motion_type") or {}
+    if isinstance(motion, dict):
+        return [str(v) for v in motion.values()]
+    if isinstance(motion, list):
+        return [str(v) for v in motion]
+    return []
+
+
+def _temporal_intent_realization(
+    cuts: list[dict[str, Any]],
+    temporal: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for cut in cuts:
+        for t0, t1, declared in _performance_windows(cut):
+            observed = _overlapping_types(temporal, t0, t1)
+            realized = any(kind in CHARACTER_PERFORMANCE_TYPES for kind in observed)
+            rows.append(
+                {
+                    "cut_id": str(cut.get("id") or ""),
+                    "declared": declared,
+                    "observed": observed,
+                    "result": "PASS" if realized else "FAIL",
+                }
+            )
+    return rows
+
+
+def _cut_has_no_performance(cut: dict[str, Any], temporal: dict[str, Any] | None) -> bool:
+    """True when a declared performance window was not realized. Fail closed."""
+    return any(row["result"] == "FAIL" for row in _temporal_intent_realization([cut], temporal))

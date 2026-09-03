@@ -1,0 +1,31 @@
+provider: runninghub
+profile_id: rh_h3_fl2va_final_v1
+mode: workflow_api
+# RH-001: clone FL2VA → UI run → Export Workflow API JSON → fill these.
+# NEVER put RUNNINGHUB_API_KEY here.
+workflow_id: ""
+workflow_api_json: C:\ContentStudio\jobs\rh-001-provider-lifecycle-v1\working\API_WORKFLOW.json
+workflow_api_json_sha256: ""
+resolution: 1080p
+bindings:
+  first_frame:
+    node_id: ""
+    field: image
+  last_frame:
+    node_id: ""
+    field: image
+  prompt:
+    node_id: ""
+    field: text
+  duration:
+    node_id: ""
+    field: value
+quote:
+  usd: null
+  coins_unknown: true
+  requires_confirm: true
+notes:
+  - Workflow API docs: POST /task/openapi/create + /task/openapi/outputs
+  - Empty workflow_id / hash / node_id makes quote legal and submit illegal
+  - Hash mismatch FAIL CLOSED (UI save can change nodeIds)
+  - Consumer-Member keys can call Workflow API; Model/LLM need Enterprise-Shared

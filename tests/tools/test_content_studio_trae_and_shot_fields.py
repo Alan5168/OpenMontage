@@ -25,6 +25,8 @@ def test_vid3_shot_fields_validate_on_existing_scene_plan():
     assert scene["generation_status"] == "pending"
     assert scene["voice_segment_ids"] == ["v1"]
     assert scene["voice_segment_refs"][0]["segment_id"] == "v1"
+    assert scene["character_variant"]["character_id"] == "jesse"
+    assert "bible/jesse/approved/idle_doorway.png" not in scene["character_variant"]["still_refs"]
 
 
 def test_existing_eight_column_fixture_still_valid_without_shot_fields():

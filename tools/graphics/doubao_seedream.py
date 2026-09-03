@@ -110,14 +110,28 @@ class DoubaoSeedream(BaseTool):
             return [path]
         return [path.with_name(f"{path.stem}_{index + 1}{path.suffix}") for index in range(count)]
 
+    MIN_PIXELS = 1920 * 1920
+
+    def _size(self, inputs: dict[str, Any]) -> str:
+        if inputs.get("width") and inputs.get("height"):
+            width = int(inputs["width"])
+            height = int(inputs["height"])
+            pixels = width * height
+            if pixels < self.MIN_PIXELS:
+                scale = (self.MIN_PIXELS / pixels) ** 0.5
+                width = max(1, int(round(width * scale)))
+                height = max(1, int(round(height * scale)))
+                while width * height < self.MIN_PIXELS:
+                    width += 1
+            return f"{width}x{height}"
+        return str(inputs.get("size") or "2048x2048")
+
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
         api_key = self._api_key()
         if not api_key:
             return ToolResult(success=False, error="ARK_AGENTPLAN_API_KEY not set. " + self.install_instructions)
 
-        size = inputs.get("size") or "2048x2048"
-        if inputs.get("width") and inputs.get("height"):
-            size = f"{int(inputs['width'])}x{int(inputs['height'])}"
+        size = self._size(inputs)
         body: dict[str, Any] = {
             "model": self._model(),
             "prompt": inputs["prompt"],
