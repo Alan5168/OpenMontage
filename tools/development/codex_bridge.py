@@ -20,7 +20,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from tools.base_tool import BaseTool, ToolResult, ToolStatus, ToolTier, ToolStability
+from tools.base_tool import (
+    BaseTool,
+    ToolResult,
+    ToolRuntime,
+    ToolStatus,
+    ToolStability,
+    ToolTier,
+)
 
 
 class CodexExec(BaseTool):
@@ -29,7 +36,7 @@ class CodexExec(BaseTool):
     name = "codex_exec"
     capability = "development"
     provider = "codex"
-    runtime = "LOCAL"
+    runtime = ToolRuntime.LOCAL
     tier = "GENERATE"
     stability = ToolStability.EXPERIMENTAL
     capabilities = ["code_generation", "code_review", "file_editing", "debugging"]
@@ -162,7 +169,7 @@ class CodexTui(BaseTool):
     name = "codex_tui"
     capability = "development"
     provider = "codex"
-    runtime = "LOCAL"
+    runtime = ToolRuntime.LOCAL
     tier = "GENERATE"
     stability = ToolStability.EXPERIMENTAL
     capabilities = ["interactive_coding", "code_review", "debugging"]
