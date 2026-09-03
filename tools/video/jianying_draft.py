@@ -355,7 +355,7 @@ class JianYingDraftExport(BaseTool):
     determinism = Determinism.DETERMINISTIC
 
     dependencies = ["py:pyJianYingDraft"]
-    agent_skills = ["content-studio-director", "openmontage-pipeline"]
+    agent_skills = ["content-studio-director"]  # openmontage-pipeline pointer removed: skill never existed
 
     capabilities = [
         "create_draft",

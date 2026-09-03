@@ -699,6 +699,7 @@ class TestCapabilityMetadata:
             "fal.ai",
             "google_tts",
             "kling_official",
+            "mimo",  # local Xiaomi MiMo Token Plan TTS provider
             "openai",
             "piper",
         }
