@@ -618,9 +618,7 @@ class ComfyUIVideo(BaseTool):
                 workflow,
                 output_node=output_node,
                 dest=output_path,
-                timeout=inputs.get(
-                    "timeout_seconds", 3600 if model_family in partner_nodes else 900
-                ),
+                timeout=inputs.get("timeout_seconds", 3600),
                 interval=poll_interval,
                 resume_prompt_id=inputs.get("resume_prompt_id"),
                 on_progress=self._log_progress,
