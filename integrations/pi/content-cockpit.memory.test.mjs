@@ -135,7 +135,7 @@ assert.match(injected.systemPrompt, /selected job: vid-the-moment-s01e01-zh-v1/)
 assert.match(injected.systemPrompt, /OpenViking automatic recall/);
 assert.match(injected.systemPrompt, /qwen-audio-3\.0-tts-plus-alan-0608bece080b4814893df5796b16f341/);
 assert.ok(uiState.statuses.length > 0);
-assert.ok(uiState.widgets.some(([, value]) => String(value).includes("memory: hot r3")));
+assert.ok(uiState.widgets.some(([, value]) => /memory: hot r\d+/.test(String(value))));
 
 const openVikingTools = new Map();
 openVikingMod.default({

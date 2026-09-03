@@ -30,7 +30,7 @@ const STUDIO = path.join(REPO, "tools", "studio.py");
 const ROLES_DIR = path.join(ROOT, "ROLES");
 const ROLE_STATE = path.join(ROOT, "runtime", "cockpit_role.json");
 const LOG_DIR = path.join(ROOT, "logs", "cockpit");
-const ROLES = ["DIRECTOR", "WRITER", "ART"];
+const ROLES = ["DIRECTOR", "WRITER", "ART", "PRODUCER"];
 const HOT_MEMORY_FILE = path.join(
   ROOT,
   "context",
@@ -498,14 +498,14 @@ export default function contentCockpit(pi: ExtensionAPI) {
 
   // ---------- /role ----------
   pi.registerCommand("role", {
-    description: "Content Studio:切席位 DIRECTOR / WRITER / ART",
+    description: "Content Studio:切席位 DIRECTOR / WRITER / ART / PRODUCER",
     handler: async (args: string, ctx: any) => {
       lastCtx = ctx;
       let role = (args ?? "").trim().toUpperCase();
       if (!ROLES.includes(role)) {
         const choice = await ctx.ui.select(
           "切到哪个席位?",
-          ROLES.map((r) => `${r} — ${r === "DIRECTOR" ? "导演/剪辑:批准、看片、终剪、发布" : r === "WRITER" ? "编剧:剧本/集纲/分镜表" : "美术:定妆/场景卡/关键帧"}`),
+          ROLES.map((r) => `${r} — ${r === "DIRECTOR" ? "导演/剪辑:批准、看片、终剪、发布" : r === "WRITER" ? "编剧:剧本/集纲/分镜表" : r === "ART" ? "美术:定妆/场景卡/关键帧" : "制片:技术工具/流程推进/堵点排查"}`),
         );
         if (!choice) return;
         role = choice.split(" — ")[0];
